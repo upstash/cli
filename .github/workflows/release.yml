@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  npm:
+    name: Release on npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+
+      - name: Set env
+        run: echo "VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+
+      - run: curl -fsSL https://deno.land/x/install/install.sh | sh
+
+      - run: echo "$HOME/.deno/bin" > $GITHUB_PATH
+
+      - name: Build
+        run: deno --unstable run -A ./cmd/build.ts $VERSION
+
+      - name: Publish
+        if: "!github.event.release.prerelease"
+        working-directory: ./dist
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{secrets.NPM_TOKEN}}" > .npmrc
+          npm publish --access public
+
+      - name: Publish release candidate
+        if: "github.event.release.prerelease"
+        working-directory: ./dist
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{secrets.NPM_TOKEN}}" > .npmrc
+          npm publish --access public --tag=next
+
+  binaries:
+    name: Release binary
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          [
+            "x86_64-unknown-linux-gnu",
+            "x86_64-pc-windows-msvc",
+            "x86_64-apple-darwin",
+            "aarch64-apple-darwin",
+          ]
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+
+      - run: curl -fsSL https://deno.land/x/install/install.sh | sh
+      - run: echo "$HOME/.deno/bin" > $GITHUB_PATH
+
+      - name: compile
+        run: deno --unstable compile --allow-env --allow-read --allow-write --allow-net --target=${{ matrix.arch }} --output=./bin/upstash_${{ matrix.arch}} ./src/mod.ts
+
+      - name: upload
+        run: gh release upload ${GITHUB_REF#refs/*/} ./bin/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

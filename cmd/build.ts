@@ -6,6 +6,11 @@ const version = Deno.args[0];
 
 await emptyDir(outDir);
 
+Deno.writeTextFileSync(
+  "./src/version.ts",
+  `export const VERSION = "${version}"`,
+);
+
 await build({
   packageManager,
   entryPoints: [{ kind: "bin", name: "upstash", path: "src/mod.ts" }],
@@ -13,6 +18,7 @@ await build({
   shims: {
     deno: true,
     crypto: true,
+    undici: true,
   },
 
   scriptModule: false,
@@ -43,8 +49,9 @@ await build({
   },
 });
 Deno.writeTextFileSync(
-  "./dist/src/version.ts",
-  `export const VERSION = "${version}"`,
+  "./src/version.ts",
+  `// This is set during build
+export const VERSION = "development";`,
 );
 
 // post build steps

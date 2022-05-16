@@ -7,7 +7,7 @@ import { statsCmd } from "./stats.ts";
 
 const topicCmd = new Command()
   .description("Manage kafka topics")
-  .globalOption("--json [boolean]", "Return raw json response")
+  .globalOption("--json=<boolean:boolean>", "Return raw json response")
   .command("create", createCmd)
   .command("delete", deleteCmd)
   .command("get", getCmd)

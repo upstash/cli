@@ -11,7 +11,7 @@ import { enableMultizoneReplicationCmd } from "./enable_multizone_replication.ts
 import { moveToTeamCmd } from "./move_to_team.ts";
 const redisCmd = new Command()
   .description("Manage redis database instances")
-  .globalOption("--json [boolean]", "Return raw json response")
+  .globalOption("--json=<boolean:boolean>", "Return raw json response")
   .command("create", createCmd)
   .command("list", listCmd)
   .command("get", getCmd)

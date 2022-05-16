@@ -21,14 +21,16 @@ export const createCmd = new Command()
   .option("-r --region <string:region>", "Region of the database", {
     required: true,
   })
-  .option("--tls [boolean]", "Set true to enable tls", { default: true })
+  .option("--tls=<boolean:boolean>", "Set true to enable tls", {
+    default: true,
+  })
   .option(
-    "--multizone-replication [boolean]",
+    "--multizone-replication=<boolean:boolean>",
     "Set true to enable multizone-replication",
     { default: false },
   )
   .option(
-    "-c --consistent [boolean]",
+    "--consistent=<boolean:boolean>",
     "Set true to enable strong consistency",
     { default: false },
   )

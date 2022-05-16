@@ -9,7 +9,7 @@ import { statsCmd } from "./stats.ts";
 import { topicsCmd } from "./topics.ts";
 const clusterCmd = new Command()
   .description("Manage kafka cluster")
-  .globalOption("--json [boolean]", "Return raw json response")
+  .globalOption("--json=<boolean:boolean>", "Return raw json response")
   .command("create", createCmd)
   .command("list", listCmd)
   .command("rename", renameCmd)

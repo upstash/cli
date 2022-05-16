@@ -41,7 +41,7 @@ for windows, linux and mac (both intel and m1).
 
     -h, --help                    - Show this help.
     -V, --version                 - Show the version number for this program.
-    --non-interactive  [boolean]  - Disable interactive prompts and throws an error instead
+    --non-interactive  <boolean>  - Disable interactive prompts and throws an error instead
     -c, --config       <string>   - Path to .upstash.json file
 
   Commands:
@@ -61,7 +61,7 @@ for windows, linux and mac (both intel and m1).
 ## Authentication
 
 When running `upstash` for the first time, you should log in using
-`upstash auth login`. Provide your email and a api key.
+`upstash auth login`. Provide your email and an api key.
 [See here for how to get a key.](https://docs.upstash.com/redis/howto/developerapi#api-development)
 
 As an alternative to logging in, you can provide `UPSTASH_EMAIL` and
@@ -119,6 +119,17 @@ upstash redis create --name=my-db
    us-east-1
    ap-northeast-1
    us-central1
+```
+
+## Output
+
+Most commands support the `--json` flag to return the raw api response as json,
+which you can parse and automate your system.
+
+```bash
+> upstash  redis create --name=test2113 --region=us-central1 --json | jq '.endpoint'
+
+ "gusc1-clean-gelding-30208.upstash.io"
 ```
 
 ## Contributing

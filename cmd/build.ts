@@ -44,7 +44,7 @@ await build({
 });
 Deno.writeTextFileSync(
   "./dist/src/version.ts",
-  `export const VERSION = "${version}"`
+  `export const VERSION = "${version}"`,
 );
 
 // post build steps

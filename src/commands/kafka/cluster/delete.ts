@@ -3,14 +3,6 @@ import { Command } from "../../../util/command.ts";
 import { parseAuth } from "../../../util/auth.ts";
 import { http } from "../../../util/http.ts";
 import type { Cluster } from "./types.ts";
-// Not exhaustive, but that's all we need
-type Response = {
-  database_id: string;
-  password: string;
-  endpoint: string;
-  port: number;
-  tls: boolean;
-};
 
 export const deleteCmd = new Command()
   .name("delete")

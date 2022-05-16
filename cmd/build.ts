@@ -22,6 +22,7 @@ await build({
   },
 
   scriptModule: false,
+  declaration: false,
   typeCheck: false,
   test: typeof Deno.env.get("TEST") !== "undefined",
   package: {

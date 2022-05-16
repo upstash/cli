@@ -2,16 +2,7 @@ import { cliffy } from "../../deps.ts";
 import { Command } from "../../util/command.ts";
 import { parseAuth } from "../../util/auth.ts";
 import { http } from "../../util/http.ts";
-
-// Not exhaustive, but that's all we need
-type Response = {
-  database_id: string;
-  password: string;
-  endpoint: string;
-  port: number;
-  tls: boolean;
-};
-
+import type { Database } from "./types.ts";
 export const deleteCmd = new Command()
   .name("delete")
   .description("delete a redis database")
@@ -24,9 +15,7 @@ export const deleteCmd = new Command()
       if (options.ci) {
         throw new cliffy.ValidationError("id");
       }
-      const dbs = await http.request<
-        { database_name: string; database_id: string }[]
-      >({
+      const dbs = await http.request<Database[]>({
         method: "GET",
         authorization,
         path: ["v2", "redis", "databases"],

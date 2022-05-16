@@ -3,14 +3,7 @@ import { Command } from "../../util/command.ts";
 import { parseAuth } from "../../util/auth.ts";
 import { http } from "../../util/http.ts";
 
-// Not exhaustive, but that's all we need
-type Database = {
-  database_id: string;
-  password: string;
-  endpoint: string;
-  port: number;
-  tls: boolean;
-};
+import type { Database } from "./types.ts";
 
 export const resetPasswordCmd = new Command()
   .name("reset-password")

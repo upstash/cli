@@ -2,16 +2,7 @@ import { cliffy } from "../../deps.ts";
 import { Command } from "../../util/command.ts";
 import { parseAuth } from "../../util/auth.ts";
 import { http } from "../../util/http.ts";
-
-// Not exhaustive, but that's all we need
-type DB = {
-  database_id: string;
-  database_name: string;
-  region: string;
-  tls: boolean;
-  consistent: boolean;
-};
-
+import type { Database } from "./types.ts";
 export const listCmd = new Command()
   .name("list")
   .description("list all your databases")
@@ -20,7 +11,7 @@ export const listCmd = new Command()
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    const dbs = await http.request<DB[]>({
+    const dbs = await http.request<Database[]>({
       method: "GET",
       authorization,
       path: ["v2", "redis", "databases"],

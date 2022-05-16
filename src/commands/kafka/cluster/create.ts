@@ -2,15 +2,11 @@ import { cliffy } from "../../../deps.ts";
 import { Command } from "../../../util/command.ts";
 import { parseAuth } from "../../../util/auth.ts";
 import { http } from "../../../util/http.ts";
+import type { Cluster } from "./types.ts";
 enum Region {
   "eu-east-1" = "eu-east-1",
   "us-east-1" = "us-east-1",
 }
-
-// Not exhaustive, but that's all we need
-type Response = {
-  cluster_id: string;
-};
 
 export const createCmd = new Command()
   .name("create")
@@ -55,7 +51,7 @@ export const createCmd = new Command()
       multizone: options.multizoneReplication,
     };
 
-    const cluster = await http.request<Response>({
+    const cluster = await http.request<Cluster>({
       method: "POST",
       authorization,
       path: ["v2", "kafka", "cluster"],

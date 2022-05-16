@@ -2,15 +2,7 @@ import { cliffy } from "../../deps.ts";
 import { Command } from "../../util/command.ts";
 import { parseAuth } from "../../util/auth.ts";
 import { http } from "../../util/http.ts";
-
-// Not exhaustive, but that's all we need
-type Response = {
-  database_id: string;
-  password: string;
-  endpoint: string;
-  port: number;
-  tls: boolean;
-};
+import type { Database } from "./types.ts";
 
 export const getCmd = new Command()
   .name("get")
@@ -40,7 +32,7 @@ export const getCmd = new Command()
       });
     }
 
-    const db = await http.request<Response>({
+    const db = await http.request<Database>({
       method: "GET",
       authorization,
       path: ["v2", "redis", "database", options.id!],

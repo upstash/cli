@@ -2,8 +2,7 @@ import { cliffy } from "../../deps.ts";
 import { Command } from "../../util/command.ts";
 import { parseAuth } from "../../util/auth.ts";
 import { http } from "../../util/http.ts";
-// Not exhaustive, but that's all we need
-
+import type { Database } from "./types.ts";
 export enum Region {
   global = "global",
   "us-west-1" = "us-west-1",
@@ -13,14 +12,6 @@ export enum Region {
   "ap-northeast-1" = "ap-northeast-1",
   "us-central1" = "us-central1",
 }
-
-type Response = {
-  database_id: string;
-  password: string;
-  endpoint: string;
-  port: number;
-  tls: boolean;
-};
 
 export const createCmd = new Command()
   .name("create")
@@ -71,7 +62,7 @@ export const createCmd = new Command()
       consistent: options.consistent,
     };
 
-    const db = await http.request<Response>({
+    const db = await http.request<Database>({
       method: "POST",
       authorization,
       path: ["v2", "redis", "database"],

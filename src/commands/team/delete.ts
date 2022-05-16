@@ -6,7 +6,7 @@ export const deleteCmd = new Command()
   .name("delete")
   .description("delete a team")
   .option("--id <id:string>", "The uuid of your database")
-  .example("Delete", `upstash team delete ${crypto.randomUUID()}`)
+  .example("Delete", `upstash team delete f860e7e2-27b8-4166-90d5-ea41e90b4809`)
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 

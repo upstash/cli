@@ -9,7 +9,7 @@ clean:
 	rm -rf dist
 
 build-node: fmt
-	deno --unstable run -A ./cmd/build.ts
+	deno run -A ./cmd/build.ts
 
 
 build-bin: fmt

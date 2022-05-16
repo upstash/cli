@@ -10,7 +10,7 @@ export const removeMemberCmd = new Command()
   .option("--email=<string>", "The email of the member")
   .example(
     "Remove",
-    `upstash team remove-member ${crypto.randomUUID()} ${crypto.randomUUID()}`,
+    `upstash team remove-member f860e7e2-27b8-4166-90d5-ea41e90b4809 f860e7e2-27b8-4166-90d5-ea41e90b4809`,
   )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);

@@ -6,47 +6,47 @@ import { http } from "../../util/http.ts";
 export const moveToTeamCmd = new Command()
   .name("move-to-team")
   .description("Move a redis database to another team")
-  .option("--id=<string>", "The id of your database")
-  .option("--team-id=<string>", "The id of a team")
+  .option("--id=<string>", "The id of your database", { required: true })
+  .option("--team-id=<string>", "The id of a team", { required: true })
   .example("Move", `upstash redis move-to-team`)
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.id) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("id");
-      }
-      const dbs = await http.request<
-        { database_name: string; database_id: string }[]
-      >({
-        method: "GET",
-        authorization,
-        path: ["v2", "redis", "databases"],
-      });
-      options.id = await cliffy.Select.prompt({
-        message: "Select a database to move",
-        options: dbs.map(({ database_name, database_id }) => ({
-          name: database_name,
-          value: database_id,
-        })),
-      });
-    }
-    if (!options.teamId) {
-      const teams = await http.request<
-        { team_name: string; team_id: string }[]
-      >({
-        method: "GET",
-        authorization,
-        path: ["v2", "teams"],
-      });
-      options.teamId = await cliffy.Select.prompt({
-        message: "Select the new team",
-        options: teams.map(({ team_name, team_id }) => ({
-          name: team_name,
-          value: team_id,
-        })),
-      });
-    }
+    // if (!options.id) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("id");
+    //   }
+    //   const dbs = await http.request<
+    //     { database_name: string; database_id: string }[]
+    //   >({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "redis", "databases"],
+    //   });
+    //   options.id = await cliffy.Select.prompt({
+    //     message: "Select a database to move",
+    //     options: dbs.map(({ database_name, database_id }) => ({
+    //       name: database_name,
+    //       value: database_id,
+    //     })),
+    //   });
+    // }
+    // if (!options.teamId) {
+    //   const teams = await http.request<
+    //     { team_name: string; team_id: string }[]
+    //   >({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "teams"],
+    //   });
+    //   options.teamId = await cliffy.Select.prompt({
+    //     message: "Select the new team",
+    //     options: teams.map(({ team_name, team_id }) => ({
+    //       name: team_name,
+    //       value: team_id,
+    //     })),
+    //   });
+    // }
 
     const db = await http.request({
       method: "POST",

@@ -16,32 +16,41 @@ export async function parseAuth(options: {
   if (config) {
     email = config.email;
     apiKey = config.apiKey;
+    // }
+
+    // if (email == "") {
+    //   if (options.upstashEmail) {
+    //     email = options.upstashEmail;
+    //   } else if (!options.ci) {
+    //     email = await cliffy.Input.prompt("Enter your email");
+    //   }
+    //   if (email === "") {
+    //     throw new cliffy.ValidationError(
+    //       "Provide either `UPSTASH_EMAIL` or --email=",
+    //     );
+    //   }
+    // }
+    // if (apiKey === "") {
+    //   if (options.upstashApiKey) {
+    //     apiKey = options.upstashApiKey;
+    //   } else if (!options.ci) {
+    //     apiKey = await cliffy.Secret.prompt("Enter your api apiKey");
+    //   }
+    //   if (apiKey === "") {
+    //     throw new cliffy.ValidationError(
+    //       "Provide either `UPSTASH_TOKEN` or --apiKey=",
+    //     );
+    //   }
+    // }
   }
 
-  if (email == "") {
-    if (options.upstashEmail) {
-      email = options.upstashEmail;
-    } else if (!options.ci) {
-      email = await cliffy.Input.prompt("Enter your email");
-    }
-    if (email === "") {
-      throw new cliffy.ValidationError(
-        "Provide either `UPSTASH_EMAIL` or --email=",
-      );
-    }
+  if (!email || email === "") {
+    throw new cliffy.ValidationError("email");
   }
-  if (apiKey === "") {
-    if (options.upstashApiKey) {
-      apiKey = options.upstashApiKey;
-    } else if (!options.ci) {
-      apiKey = await cliffy.Secret.prompt("Enter your api apiKey");
-    }
-    if (apiKey === "") {
-      throw new cliffy.ValidationError(
-        "Provide either `UPSTASH_TOKEN` or --apiKey=",
-      );
-    }
+  if (!apiKey || apiKey === "") {
+    throw new cliffy.ValidationError("apiKey");
   }
-
-  return `Basic ${base64.encode([email, apiKey].join(":"))}`;
+  return await Promise.resolve(
+    `Basic ${base64.encode([email, apiKey].join(":"))}`,
+  );
 }

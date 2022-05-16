@@ -10,11 +10,11 @@ import {
   Topic,
 } from "./types.ts";
 
-import type { Cluster } from "../cluster/types.ts";
+// import type { Cluster } from "../cluster/types.ts";
 export const reconfigureCmd = new Command()
   .name("reconfigure")
   .description("Reconfigure a kafka topic")
-  .option("--id=<string>", "The id of your topic")
+  .option("--id=<string>", "The id of your topic", { required: true })
   .type("retention-time", new cliffy.EnumType(retentionTime))
   .type("retention-size", new cliffy.EnumType(retentionSize))
   .type("max-message-size", new cliffy.EnumType(maxMessageSize))
@@ -33,90 +33,90 @@ export const reconfigureCmd = new Command()
   )
   .example(
     "Create",
-    `upstash kafka topic reconfigure --topic-id=${crypto.randomUUID()} --retention-time="1week"`,
+    `upstash kafka topic reconfigure --topic-id=f860e7e2-27b8-4166-90d5-ea41e90b4809 --retention-time="1week"`,
   )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.id) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("id");
-      }
+    // if (!options.id) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("id");
+    //   }
 
-      const clusters = await http.request<Cluster[]>({
-        method: "GET",
-        authorization,
-        path: ["v2", "kafka", "clusters"],
-      });
+    //   const clusters = await http.request<Cluster[]>({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "kafka", "clusters"],
+    //   });
 
-      const clusterID = await cliffy.Select.prompt({
-        message: "Select a cluster",
-        options: clusters.map(({ name, cluster_id }) => ({
-          name: name,
-          value: cluster_id,
-        })),
-      });
-      const topics = await http.request<Topic[]>({
-        method: "GET",
-        authorization,
-        path: ["v2", "kafka", "topics", clusterID],
-      });
-      options.id = await cliffy.Select.prompt({
-        message: "Select a topic",
-        options: topics.map((t) => ({
-          name: t.topic_name,
-          value: t.topic_id,
-        })),
-      });
-    }
-    if (!options.retentionTime) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("retentionTime");
-      }
+    //   const clusterID = await cliffy.Select.prompt({
+    //     message: "Select a cluster",
+    //     options: clusters.map(({ name, cluster_id }) => ({
+    //       name: name,
+    //       value: cluster_id,
+    //     })),
+    //   });
+    //   const topics = await http.request<Topic[]>({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "kafka", "topics", clusterID],
+    //   });
+    //   options.id = await cliffy.Select.prompt({
+    //     message: "Select a topic",
+    //     options: topics.map((t) => ({
+    //       name: t.topic_name,
+    //       value: t.topic_id,
+    //     })),
+    //   });
+    // }
+    // if (!options.retentionTime) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("retentionTime");
+    //   }
 
-      options.retentionTime = parseInt(
-        await cliffy.Select.prompt({
-          message: "Change Retention Time",
+    //   options.retentionTime = parseInt(
+    //     await cliffy.Select.prompt({
+    //       message: "Change Retention Time",
 
-          options: Object.entries(retentionTime).map(([name, value]) => ({
-            name,
-            value: value.toString(),
-          })),
-        }),
-      );
-    }
-    if (!options.retentionSize) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("retentionSize");
-      }
+    //       options: Object.entries(retentionTime).map(([name, value]) => ({
+    //         name,
+    //         value: value.toString(),
+    //       })),
+    //     }),
+    //   );
+    // }
+    // if (!options.retentionSize) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("retentionSize");
+    //   }
 
-      options.retentionSize = parseInt(
-        await cliffy.Select.prompt({
-          message: "Change Retention Size",
+    //   options.retentionSize = parseInt(
+    //     await cliffy.Select.prompt({
+    //       message: "Change Retention Size",
 
-          options: Object.entries(retentionSize).map(([name, value]) => ({
-            name,
-            value: value.toString(),
-          })),
-        }),
-      );
-    }
-    if (!options.maxMessageSize) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("maxMessageSize");
-      }
+    //       options: Object.entries(retentionSize).map(([name, value]) => ({
+    //         name,
+    //         value: value.toString(),
+    //       })),
+    //     }),
+    //   );
+    // }
+    // if (!options.maxMessageSize) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("maxMessageSize");
+    //   }
 
-      options.maxMessageSize = parseInt(
-        await cliffy.Select.prompt({
-          message: "Change maximum message size",
+    //   options.maxMessageSize = parseInt(
+    //     await cliffy.Select.prompt({
+    //       message: "Change maximum message size",
 
-          options: Object.entries(maxMessageSize).map(([name, value]) => ({
-            name,
-            value: value.toString(),
-          })),
-        }),
-      );
-    }
+    //       options: Object.entries(maxMessageSize).map(([name, value]) => ({
+    //         name,
+    //         value: value.toString(),
+    //       })),
+    //     }),
+    //   );
+    // }
 
     const body: Record<string, number> = {};
     if (options.retentionTime) {

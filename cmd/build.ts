@@ -2,7 +2,7 @@ import { build, emptyDir } from "https://deno.land/x/dnt@0.23.0/mod.ts";
 
 const packageManager = "npm";
 const outDir = "./dist";
-const version = Deno.args[0];
+const version = Deno.args[0] ?? "development";
 
 await emptyDir(outDir);
 
@@ -17,8 +17,13 @@ await build({
   outDir,
   shims: {
     deno: true,
-    crypto: true,
-    undici: true,
+    // undici: true,
+    custom: [
+      {
+        package: { name: "node-fetch", version: "latest" },
+        globalNames: [{ name: "fetch", exportName: "default" }],
+      },
+    ],
   },
 
   scriptModule: false,

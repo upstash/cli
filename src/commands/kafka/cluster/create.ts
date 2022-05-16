@@ -11,9 +11,11 @@ enum Region {
 export const createCmd = new Command()
   .name("create")
   .description("Create a new kafka cluster")
-  .option("-n --name <string>", "Name of the cluster")
+  .option("-n --name <string>", "Name of the cluster", { required: true })
   .type("region", new cliffy.EnumType(Region))
-  .option("-r --region <string:region>", "Region of the database")
+  .option("-r --region <string:region>", "Region of the database", {
+    required: true,
+  })
   .option(
     "--multizone-replication [boolean]",
     "Set true to enable multizone-replication",
@@ -33,18 +35,18 @@ export const createCmd = new Command()
       options.name = await cliffy.Input.prompt("Set a name for your cluster");
     }
 
-    if (!options.region) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("region");
-      }
-      options.region = (await cliffy.Select.prompt({
-        message: "Select a region",
-        options: Object.entries(Region).map(([name, value]) => ({
-          name,
-          value,
-        })),
-      })) as Region;
-    }
+    // if (!options.region) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("region");
+    //   }
+    //   options.region = (await cliffy.Select.prompt({
+    //     message: "Select a region",
+    //     options: Object.entries(Region).map(([name, value]) => ({
+    //       name,
+    //       value,
+    //     })),
+    //   })) as Region;
+    // }
     const body: Record<string, string | number | boolean | undefined> = {
       name: options.name,
       region: options.region,

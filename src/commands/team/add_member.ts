@@ -16,7 +16,7 @@ export const addMemberCmd = new Command()
   .option("--role [string:role]", "The role for the new user")
   .example(
     "Add new developer",
-    `upstash team add-member --id=${crypto.randomUUID()} --member-email=bob@acme.com --role=${Role.dev}`,
+    `upstash team add-member --id=f860e7e2-27b8-4166-90d5-ea41e90b4809 --member-email=bob@acme.com --role=${Role.dev}`,
   )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);

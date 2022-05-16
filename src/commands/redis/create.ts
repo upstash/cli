@@ -16,9 +16,11 @@ export enum Region {
 export const createCmd = new Command()
   .name("create")
   .description("Create a new redis database")
-  .option("-n --name <string>", "Name of the database")
+  .option("-n --name <string>", "Name of the database", { required: true })
   .type("region", new cliffy.EnumType(Region))
-  .option("-r --region <string:region>", "Region of the database")
+  .option("-r --region <string:region>", "Region of the database", {
+    required: true,
+  })
   .option("--tls [boolean]", "Set true to enable tls", { default: true })
   .option(
     "--multizone-replication [boolean]",
@@ -35,25 +37,25 @@ export const createCmd = new Command()
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.name) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("name");
-      }
-      options.name = await cliffy.Input.prompt("Set a name for your database");
-    }
+    // if (!options.name) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("name");
+    //   }
+    //   options.name = await cliffy.Input.prompt("Set a name for your database");
+    // }
 
-    if (!options.region) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("region");
-      }
-      options.region = (await cliffy.Select.prompt({
-        message: "Select a region",
-        options: Object.entries(Region).map(([name, value]) => ({
-          name,
-          value,
-        })),
-      })) as Region;
-    }
+    // if (!options.region) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("region");
+    //   }
+    //   options.region = (await cliffy.Select.prompt({
+    //     message: "Select a region",
+    //     options: Object.entries(Region).map(([name, value]) => ({
+    //       name,
+    //       value,
+    //     })),
+    //   })) as Region;
+    // }
     const body: Record<string, string | number | boolean | undefined> = {
       database_name: options.name,
       region: options.region,

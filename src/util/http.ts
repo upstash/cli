@@ -27,10 +27,10 @@ class HttpClient {
     const url = [this.baseUrl, ...req.path].join("/");
     const init: RequestInit = {
       method: req.method,
-      headers: new Headers({
+      headers: {
         "Content-Type": "application/json",
         Authorization: req.authorization,
-      }),
+      },
     };
     if (req.method !== "GET") {
       init.body = JSON.stringify(req.body);

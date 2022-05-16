@@ -8,30 +8,33 @@ import type { Database } from "./types.ts";
 export const resetPasswordCmd = new Command()
   .name("reset-password")
   .description("reset the password of a redis database")
-  .option("--id=<string>", "The id of your database")
-  .example("Reset", `upstash redis reset-password ${crypto.randomUUID()}`)
+  .option("--id=<string>", "The id of your database", { required: true })
+  .example(
+    "Reset",
+    `upstash redis reset-password --id=f860e7e2-27b8-4166-90d5-ea41e90b4809`,
+  )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.id) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("id");
-      }
-      const dbs = await http.request<
-        { database_name: string; database_id: string }[]
-      >({
-        method: "GET",
-        authorization,
-        path: ["v2", "redis", "databases"],
-      });
-      options.id = await cliffy.Select.prompt({
-        message: "Select a database to delete",
-        options: dbs.map(({ database_name, database_id }) => ({
-          name: database_name,
-          value: database_id,
-        })),
-      });
-    }
+    // if (!options.id) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("id");
+    //   }
+    //   const dbs = await http.request<
+    //     { database_name: string; database_id: string }[]
+    //   >({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "redis", "databases"],
+    //   });
+    //   options.id = await cliffy.Select.prompt({
+    //     message: "Select a database to delete",
+    //     options: dbs.map(({ database_name, database_id }) => ({
+    //       name: database_name,
+    //       value: database_id,
+    //     })),
+    //   });
+    // }
 
     const db = await http.request<Database>({
       method: "POST",

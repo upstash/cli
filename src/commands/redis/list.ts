@@ -10,7 +10,6 @@ export const listCmd = new Command()
   .example("List", "upstash redis list")
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
-
     const dbs = await http.request<Database[]>({
       method: "GET",
       authorization,
@@ -20,14 +19,14 @@ export const listCmd = new Command()
       console.log(JSON.stringify(dbs, null, 2));
       return;
     }
-    if (!options.expanded) {
-      console.log(
-        cliffy.Table.from(
-          dbs.map((db) => [db.database_name, db.database_id]),
-        ).toString(),
-      );
-      return;
-    }
+    // if (!options.expanded) {
+    //   console.log(
+    //     cliffy.Table.from(
+    //       dbs.map((db) => [db.database_name, db.database_id]),
+    //     ).toString(),
+    //   );
+    //   return;
+    // }
 
     dbs.forEach((db) => {
       console.log();

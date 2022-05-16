@@ -7,28 +7,28 @@ import type { Cluster } from "./types.ts";
 export const getCmd = new Command()
   .name("get")
   .description("get information about a kafka clusters")
-  .option("--id=<string>", "The id of your cluster")
-  .example("Get", `upstash kafka cluster ${crypto.randomUUID}`)
+  .option("--id=<string>", "The id of your cluster", { required: true })
+  .example("Get", `upstash kafka cluster f860e7e2-27b8-4166-90d5-ea41e90b4809`)
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.id) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("id");
-      }
-      const clusters = await http.request<Cluster[]>({
-        method: "GET",
-        authorization,
-        path: ["v2", "kafka", "clusters"],
-      });
-      options.id = await cliffy.Select.prompt({
-        message: "Select a cluster",
-        options: clusters.map(({ name, cluster_id }) => ({
-          name: name,
-          value: cluster_id,
-        })),
-      });
-    }
+    // if (!options.id) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("id");
+    //   }
+    //   const clusters = await http.request<Cluster[]>({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "kafka", "clusters"],
+    //   });
+    //   options.id = await cliffy.Select.prompt({
+    //     message: "Select a cluster",
+    //     options: clusters.map(({ name, cluster_id }) => ({
+    //       name: name,
+    //       value: cluster_id,
+    //     })),
+    //   });
+    // }
 
     const cluster = await http.request<Cluster[]>({
       method: "GET",

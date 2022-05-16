@@ -13,8 +13,10 @@ import {
 export const createCmd = new Command()
   .name("create")
   .description("Create a new kafka topic")
-  .option("-n, --name <string>", "Name of the topic")
-  .option("-c, --cluster-id <string>", "id of the kafka cluster")
+  .option("-n, --name <string>", "Name of the topic", { required: true })
+  .option("-c, --cluster-id <string>", "id of the kafka cluster", {
+    required: true,
+  })
   .option(
     "-p, --partitions <number>",
     "The number of partitions the topic will have",
@@ -51,7 +53,7 @@ export const createCmd = new Command()
   )
   .example(
     "Create",
-    `upstash kafka topic create --cluster-id=${crypto.randomUUID()} --name=billing`,
+    `upstash kafka topic create --cluster-id=f860e7e2-27b8-4166-90d5-ea41e90b4809 --name=billing`,
   )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);

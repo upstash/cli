@@ -102,10 +102,10 @@ Let's create a new redis database:
 ## Interactive
 
 Let's face it, nobody can remember uuids of databases. That's why `upstash` is
-designed to be interactive if you omit required flags. This would cause issues
-in non-interactive environments such as tests in CI pipelines. Interactive
-propmts are disabled when the environment variable `CI` or `--non-interactive`
-flag is set.
+designed to be interactive if you omit required flags. Because this would cause
+issues in non-interactive environments such as tests in CI pipelines, propmts
+are disabled when the environment variable `CI` or `--non-interactive` flag is
+set.
 
 For example: when you omit the `--region` flag we will ask you to select one.
 

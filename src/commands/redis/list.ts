@@ -6,7 +6,7 @@ import type { Database } from "./types.ts";
 export const listCmd = new Command()
   .name("list")
   .description("list all your databases")
-  .option("-e, --expanded [boolean]", "Show expanded information")
+  .option("-e, --expanded <boolean:boolean>", "Show expanded information")
   .example("List", "upstash redis list")
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);

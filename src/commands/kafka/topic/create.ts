@@ -42,7 +42,7 @@ export const createCmd = new Command()
     { default: maxMessageSize["1mb"] },
   )
   .option(
-    "--multizone-replication [boolean]",
+    "--multizone-replication <boolean:boolean>",
     "Set true to enable multizone-replication",
     { default: false },
   )

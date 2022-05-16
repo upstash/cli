@@ -17,7 +17,7 @@ export const createCmd = new Command()
     required: true,
   })
   .option(
-    "--multizone-replication [boolean]",
+    "--multizone-replication <boolean:boolean>",
     "Set true to enable multizone-replication",
     { default: false },
   )

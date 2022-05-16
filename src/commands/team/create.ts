@@ -8,7 +8,7 @@ export const createCmd = new Command()
   .description("Create a new team")
   .option("-n --name <string>", "Name of the database")
   .option(
-    "--copy-credit-card [boolean]",
+    "--copy-credit-card <boolean:boolean>",
     "Set true to copy the credit card information to the new team",
     { default: false },
   )

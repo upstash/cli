@@ -1,6 +1,6 @@
 # Upstash CLI
 
-`upstash` allows you to manage Upstash resources in your terminal or CI!
+Manage Upstash resources in your terminal or CI.
 
 ![](./img/banner.svg)
 

@@ -38,35 +38,38 @@ cmd.reset().action(() => {
 });
 
 if (!Deno.env.get("CI")) {
-  await fetch(
-    "https://api.github.com/repos/upstash/upstash-cli/releases/latest",
-  )
-    .then((res) => res.json())
-    .then((res: { tag_name: string; html_url: string }) => {
-      if (res.tag_name > VERSION) {
-        console.log();
-        console.log(
-          `There is a new release available: ${
-            cliffy.colors.bold.underline.brightCyan(
-              res.html_url,
-            )
-          }`,
-        );
+  try {
+    await fetch(
+      "https://api.github.com/repos/upstash/cli/releases/latest",
+    )
+      .then((res) => res.json())
+      .then((res: { tag_name: string; html_url: string }) => {
+        if (res.tag_name > VERSION) {
+          console.log();
+          console.log(
+            `There is a new release available: ${
+              cliffy.colors.bold.underline.brightCyan(
+                res.html_url,
+              )
+            }`,
+          );
 
-        console.log(
-          `Run ${
-            cliffy.colors.bold.brightGreen(
-              `npm i -g @upstash/cli@${res.tag_name}`,
-            )
-          } to upgrade.`,
-        );
-        console.log();
-        console.log();
-      }
-    })
-    .catch((err) => {
-      console.warn(err);
-    });
+          console.log(
+            `Run ${
+              cliffy.colors.bold.brightGreen(
+                `npm i -g @upstash/cli@${res.tag_name}`,
+              )
+            } to upgrade.`,
+          );
+          console.log();
+          console.log();
+        }
+      })
+      .catch((err) => {
+        console.warn(err);
+      });
+    // deno-lint-ignore no-empty
+  } catch {}
 }
 
 await cmd.parse(Deno.args).catch((err) => {

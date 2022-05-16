@@ -132,26 +132,6 @@ which you can parse and automate your system.
  "gusc1-clean-gelding-30208.upstash.io"
 ```
 
-## Shell completions
-
-To enable bash completion you can load them in your shell of choice:
-
-### bash
-
-Add the following line to your `~/.bashrc`:
-
-```bash
-source <(upstash completions bash)
-```
-
-### zsh
-
-Add the following line to your `~/.zshrc`:
-
-```bash
-source <(upstash completions zsh)
-```
-
 ## Contributing
 
 If anything feels wrong, you discover a bug or want to request improvements,

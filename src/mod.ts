@@ -31,8 +31,7 @@ const cmd = new Command()
   .command("auth", authCmd as unknown as Command)
   .command("redis", redisCmd as unknown as Command)
   .command("kafka", kafkaCmd as unknown as Command)
-  .command("team", teamCmd as unknown as Command)
-  .command("completions", new cliffy.CompletionsCommand());
+  .command("team", teamCmd as unknown as Command);
 cmd.reset().action(() => {
   cmd.showHelp();
 });

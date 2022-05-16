@@ -31,17 +31,15 @@ const cmd = new Command()
   .command("auth", authCmd as unknown as Command)
   .command("redis", redisCmd as unknown as Command)
   .command("kafka", kafkaCmd as unknown as Command)
-  .command("team", teamCmd as unknown as Command);
-
+  .command("team", teamCmd as unknown as Command)
+  .command("completions", new cliffy.CompletionsCommand());
 cmd.reset().action(() => {
   cmd.showHelp();
 });
 
 if (!Deno.env.get("CI")) {
   try {
-    await fetch(
-      "https://api.github.com/repos/upstash/cli/releases/latest",
-    )
+    await fetch("https://api.github.com/repos/upstash/cli/releases/latest")
       .then((res) => res.json())
       .then((res: { tag_name: string; html_url: string }) => {
         if (res.tag_name > VERSION) {

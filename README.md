@@ -99,28 +99,6 @@ Let's create a new redis database:
   Connect to your database with redis-cli: redis-cli --tls -u redis://88ae6392a1084d1186a3da37fb5f5a30@eu1-magnetic-lacewing-37090.upstash.io:37090
 ```
 
-## Interactive
-
-Let's face it, nobody can remember uuids of databases. That's why `upstash` is
-designed to be interactive if you omit required flags. Because this would cause
-issues in non-interactive environments such as tests in CI pipelines, propmts
-are disabled when the environment variable `CI` or `--non-interactive` flag is
-set.
-
-For example: when you omit the `--region` flag we will ask you to select one.
-
-```bash
-upstash redis create --name=my-db
- ? Select a region
- ❯ global
-   us-west-1
-   us-west-2
-   eu-west-1
-   us-east-1
-   ap-northeast-1
-   us-central1
-```
-
 ## Output
 
 Most commands support the `--json` flag to return the raw api response as json,

@@ -11,9 +11,17 @@ export const addMemberCmd = new Command()
   .name("add-member")
   .description("Add a new member to a team")
   .type("role", new cliffy.EnumType(Role))
-  .option("--id [string]", "The id of your team")
-  .option("--member-email [string]", "The email of a user you want to add.")
-  .option("--role [string:role]", "The role for the new user")
+  .option("--id <string:string>", "The id of your team", { required: true })
+  .option(
+    "--member-email <string:string>",
+    "The email of a user you want to add.",
+    {
+      required: true,
+    },
+  )
+  .option("--role <string:role>", "The role for the new user", {
+    required: true,
+  })
   .example(
     "Add new developer",
     `upstash team add-member --id=f860e7e2-27b8-4166-90d5-ea41e90b4809 --member-email=bob@acme.com --role=${Role.dev}`,

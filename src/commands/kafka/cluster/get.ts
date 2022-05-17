@@ -33,7 +33,7 @@ export const getCmd = new Command()
     const cluster = await http.request<Cluster[]>({
       method: "GET",
       authorization,
-      path: ["v2", "kafka", "clusters", options.id],
+      path: ["v2", "kafka", "cluster", options.id],
     });
     if (options.json) {
       console.log(JSON.stringify(cluster, null, 2));

@@ -8,7 +8,7 @@ import { listMembersCmd } from "./list_members.ts";
 
 export const teamCmd = new Command()
   .description("Manage your teams and their members")
-  .globalOption("--json=<boolean:boolean>", "Return raw json response")
+  .globalOption("--json=[boolean:boolean]", "Return raw json response")
   .command("create", createCmd)
   .command("list", listCmd)
   .command("delete", deleteCmd)

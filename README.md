@@ -30,7 +30,7 @@ for windows, linux and mac (both intel and m1).
 ```bash
 > upstash
 
-  Usage:   upstash
+  Usage:   upstash    
   Version: development
 
   Description:
@@ -39,23 +39,21 @@ for windows, linux and mac (both intel and m1).
 
   Options:
 
-    -h, --help                    - Show this help.
-    -V, --version                 - Show the version number for this program.
-    --non-interactive  <boolean>  - Disable interactive prompts and throws an error instead
-    -c, --config       <string>   - Path to .upstash.json file
+    -h, --help               - Show this help.                                                                           
+    -V, --version            - Show the version number for this program.                                                 
+    -c, --config   <string>  - Path to .upstash.json file
 
   Commands:
 
-    auth   - Login and logout
-    redis  - Manage redis database instances
-    kafka  - Manage kafka clusters and topics
+    auth   - Login and logout                   
+    redis  - Manage redis database instances    
+    kafka  - Manage kafka clusters and topics   
     team   - Manage your teams and their members
 
   Environment variables:
 
-    UPSTASH_EMAIL    <string>   - The email you use on upstash
-    UPSTASH_API_KEY  <string>   - The api key from upstash
-    CI               <boolean>  - Disable interactive prompts and throws an error instead
+    UPSTASH_EMAIL    <string>  - The email you use on upstash
+    UPSTASH_API_KEY  <string>  - The api key from upstash
 ```
 
 ## Authentication

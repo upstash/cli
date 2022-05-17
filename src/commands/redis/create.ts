@@ -34,8 +34,8 @@ export const createCmd = new Command()
     "Set true to enable strong consistency",
     { default: false },
   )
-  .example("region", "upstash create --name mydb --region=us-east-1")
-  .example("global", "upstash create --name mydb --region=global")
+  .example("region", "upstash redis create --name mydb --region=us-east-1")
+  .example("global", "upstash redis create --name mydb --region=global")
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 

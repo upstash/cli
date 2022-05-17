@@ -10,44 +10,20 @@ export async function parseAuth(options: {
   ci?: boolean;
   [key: string]: unknown;
 }): Promise<string> {
-  let email = "";
-  let apiKey = "";
+  let email = options.upstashEmail;
+  let apiKey = options.upstashApiKey;
   const config = loadConfig(options.config);
-  if (config) {
+  if (config?.email) {
     email = config.email;
+  }
+  if (config?.apiKey) {
     apiKey = config.apiKey;
-    // }
-
-    // if (email == "") {
-    //   if (options.upstashEmail) {
-    //     email = options.upstashEmail;
-    //   } else if (!options.ci) {
-    //     email = await cliffy.Input.prompt("Enter your email");
-    //   }
-    //   if (email === "") {
-    //     throw new cliffy.ValidationError(
-    //       "Provide either `UPSTASH_EMAIL` or --email=",
-    //     );
-    //   }
-    // }
-    // if (apiKey === "") {
-    //   if (options.upstashApiKey) {
-    //     apiKey = options.upstashApiKey;
-    //   } else if (!options.ci) {
-    //     apiKey = await cliffy.Secret.prompt("Enter your api apiKey");
-    //   }
-    //   if (apiKey === "") {
-    //     throw new cliffy.ValidationError(
-    //       "Provide either `UPSTASH_TOKEN` or --apiKey=",
-    //     );
-    //   }
-    // }
   }
 
-  if (!email || email === "") {
+  if (!email) {
     throw new cliffy.ValidationError("email");
   }
-  if (!apiKey || apiKey === "") {
+  if (!apiKey) {
     throw new cliffy.ValidationError("apiKey");
   }
   return await Promise.resolve(

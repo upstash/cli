@@ -14,7 +14,7 @@ export const createCmd = new Command()
   .name("create")
   .description("Create a new kafka topic")
   .option("-n, --name <string>", "Name of the topic", { required: true })
-  .option("-c, --cluster-id <string>", "id of the kafka cluster", {
+  .option("--cluster-id <string>", "id of the kafka cluster", {
     required: true,
   })
   .option(
@@ -68,7 +68,7 @@ export const createCmd = new Command()
     const topic = await http.request<Topic>({
       method: "POST",
       authorization,
-      path: ["v2", "kafka", "cluster"],
+      path: ["v2", "kafka", "topic"],
       body: {
         name: options.name,
         partitions: options.partitions,

@@ -6,21 +6,23 @@ import { http } from "../../util/http.ts";
 export const createCmd = new Command()
   .name("create")
   .description("Create a new team")
-  .option("-n --name <string>", "Name of the database")
+  .option("-n --name=<string:string>", "Name of the database", {
+    required: true,
+  })
   .option(
-    "--copy-credit-card <boolean:boolean>",
+    "--copy-credit-card=<boolean:boolean>",
     "Set true to copy the credit card information to the new team",
     { default: false },
   )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.name) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("name");
-      }
-      options.name = await cliffy.Input.prompt("Set a name for your team");
-    }
+    // if (!options.name) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("name");
+    //   }
+    //   options.name = await cliffy.Input.prompt("Set a name for your team");
+    // }
 
     const body: Record<string, string | number | boolean | undefined> = {
       team_name: options.name,

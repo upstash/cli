@@ -118,7 +118,17 @@ export const reconfigureCmd = new Command()
     //   );
     // }
 
-    const body: Record<string, number> = {};
+    const current = await http.request<Topic>({
+      method: "GET",
+      authorization,
+      path: ["v2", "kafka", "topic", options.id],
+    });
+
+    const body: Record<string, number> = {
+      retention_time: current.retention_time,
+      retention_size: current.retention_size,
+      max_message_size: current.max_message_size,
+    };
     if (options.retentionTime) {
       body.retention_time = options.retentionTime;
     }

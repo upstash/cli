@@ -7,9 +7,9 @@ export const loginCmd = new Command()
 This will store your email and api key in ${DEFAULT_CONFIG_PATH}.
 you can override this with "--config=/path/to/.upstash.json"`,
   )
-  .option("-e, --email=<string>", "The email you use in upstash console")
+  .option("-e, --email=<email:string>", "The email you use in upstash console")
   .option(
-    "-k, --api-key=<string>",
+    "-k, --api-key=<api-key:string>",
     "Management api apiKey from https://console.upstash.com/account/api",
   )
   .action((options): void => {
@@ -21,7 +21,7 @@ you can override this with "--config=/path/to/.upstash.json"`,
     }
     let email = options.upstashEmail;
     if (!email) {
-      email = options.upstashEmail;
+      email = options.email;
     }
     // if (!email) {
     //   if (options.ci) {

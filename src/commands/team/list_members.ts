@@ -11,25 +11,25 @@ export const listMembersCmd = new Command()
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.id) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("teamID");
-      }
-      const teams = await http.request<
-        { team_name: string; team_id: string }[]
-      >({
-        method: "GET",
-        authorization,
-        path: ["v2", "teams"],
-      });
-      options.id = await cliffy.Select.prompt({
-        message: "Select a team to delete",
-        options: teams.map(({ team_name, team_id }) => ({
-          name: team_name,
-          value: team_id,
-        })),
-      });
-    }
+    // if (!options.id) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("teamID");
+    //   }
+    //   const teams = await http.request<
+    //     { team_name: string; team_id: string }[]
+    //   >({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "teams"],
+    //   });
+    //   options.id = await cliffy.Select.prompt({
+    //     message: "Select a team to delete",
+    //     options: teams.map(({ team_name, team_id }) => ({
+    //       name: team_name,
+    //       value: team_id,
+    //     })),
+    //   });
+    // }
     const members = await http.request<
       { database_name: string; database_id: string }[]
     >({

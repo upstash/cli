@@ -4,7 +4,7 @@ import { parseAuth } from "../../../util/auth.ts";
 import { http } from "../../../util/http.ts";
 import type { Cluster } from "./types.ts";
 enum Region {
-  "eu-east-1" = "eu-east-1",
+  "eu-west-1" = "eu-west-1",
   "us-east-1" = "us-east-1",
 }
 

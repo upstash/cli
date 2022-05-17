@@ -15,33 +15,33 @@ export const removeMemberCmd = new Command()
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
 
-    if (!options.id) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("id");
-      }
-      const teams = await http.request<
-        { team_name: string; team_id: string }[]
-      >({
-        method: "GET",
-        authorization,
-        path: ["v2", "teams"],
-      });
-      options.id = await cliffy.Select.prompt({
-        message: "Select a team",
-        options: teams.map(({ team_name, team_id }) => ({
-          name: team_name,
-          value: team_id,
-        })),
-      });
-    }
-    if (!options.email) {
-      if (options.ci) {
-        throw new cliffy.ValidationError("email");
-      }
-      options.email = await cliffy.Input.prompt("Enter the user's email");
-    }
+    // if (!options.id) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("id");
+    //   }
+    //   const teams = await http.request<
+    //     { team_name: string; team_id: string }[]
+    //   >({
+    //     method: "GET",
+    //     authorization,
+    //     path: ["v2", "teams"],
+    //   });
+    //   options.id = await cliffy.Select.prompt({
+    //     message: "Select a team",
+    //     options: teams.map(({ team_name, team_id }) => ({
+    //       name: team_name,
+    //       value: team_id,
+    //     })),
+    //   });
+    // }
+    // if (!options.email) {
+    //   if (options.ci) {
+    //     throw new cliffy.ValidationError("email");
+    //   }
+    //   options.email = await cliffy.Input.prompt("Enter the user's email");
+    // }
 
-    const db = await http.request<Response>({
+    const team = await http.request({
       method: "DELETE",
       authorization,
       path: ["v2", "teams", "member"],
@@ -51,7 +51,7 @@ export const removeMemberCmd = new Command()
       },
     });
     if (options.json) {
-      console.log(JSON.stringify(db, null, 2));
+      console.log(JSON.stringify(team, null, 2));
       return;
     }
     console.log(cliffy.colors.brightGreen("Member has been removed"));

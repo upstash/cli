@@ -4,7 +4,7 @@ Manage Upstash resources in your terminal or CI.
 
 ![](./img/banner.svg)
 
-[![Version](https://img.shields.io/npm/v/lstr.svg)](https://npmjs.org/package/@upstash/cli)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/upstash/cli)
 [![Downloads/week](https://img.shields.io/npm/dw/lstr.svg)](https://npmjs.org/package/@upstash/cli)
 
 # Installation

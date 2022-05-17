@@ -44,7 +44,6 @@ await cmd.parse(Deno.args).catch((err) => {
     Deno.exit(err.exitCode);
   } else {
     console.error(`Error: ${err.message}`);
-    console.error(err);
 
     Deno.exit(1);
   }

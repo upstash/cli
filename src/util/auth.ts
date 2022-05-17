@@ -1,4 +1,4 @@
-import { base64, cliffy } from "../deps.ts";
+import { base64 } from "../deps.ts";
 import { loadConfig } from "../config.ts";
 /**
  * Parse cli config and return a basic auth header string
@@ -20,12 +20,12 @@ export async function parseAuth(options: {
     apiKey = config.apiKey;
   }
 
-  if (!email) {
-    throw new cliffy.ValidationError("email");
+  if (!email || !apiKey) {
+    throw new Error(
+      `Not authenticated, please run "upstash auth login" or specify your config file with "--config=/path/to/.upstash.json"`,
+    );
   }
-  if (!apiKey) {
-    throw new cliffy.ValidationError("apiKey");
-  }
+
   return await Promise.resolve(
     `Basic ${base64.encode([email, apiKey].join(":"))}`,
   );

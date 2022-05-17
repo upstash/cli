@@ -2,7 +2,7 @@ import { cliffy } from "../deps.ts";
 
 type GlobalConfig = {
   upstashEmail?: string;
-  upstashToken?: string;
+  upstashApiKey?: string;
   ci?: boolean;
   json?: boolean;
   config: string;

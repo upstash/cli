@@ -1,5 +1,6 @@
 import { Command } from "../../util/command.ts";
 import { DEFAULT_CONFIG_PATH, loadConfig } from "../../config.ts";
+import { cliffy } from "../../deps.ts";
 export const loginCmd = new Command()
   .name("login")
   .description(
@@ -23,6 +24,12 @@ you can override this with "--config=/path/to/.upstash.json"`,
     if (!email) {
       email = options.email;
     }
+
+    if (!email) {
+      throw new cliffy.ValidationError(
+        `email is missing, either use "--email" or set "UPSTASH_EMAIL" environment variable`,
+      );
+    }
     // if (!email) {
     //   if (options.ci) {
     //     throw new cliffy.ValidationError("email");
@@ -30,10 +37,15 @@ you can override this with "--config=/path/to/.upstash.json"`,
     //   email = await cliffy.Input.prompt("Enter your email");
     // }
 
-    let apiKey = options.upstashToken;
+    let apiKey = options.upstashApiKey;
 
     if (!apiKey) {
       apiKey = options.apiKey;
+    }
+    if (!apiKey) {
+      throw new cliffy.ValidationError(
+        `api key is missing, either use "--api-key" or set "UPSTASH_API_KEY" environment variable`,
+      );
     }
     // if (!apiKey) {
     //   if (options.ci) {

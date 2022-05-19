@@ -38,7 +38,7 @@ await build({
       "An HTTP/REST based Redis client built on top of Upstash REST API.",
     repository: {
       type: "git",
-      url: "git+https://github.com/upstash/upstash-redis.git",
+      url: "git+https://github.com/upstash/cli.git",
     },
     keywords: ["redis", "database", "serverless", "edge", "upstash"],
     contributors: [
@@ -49,9 +49,9 @@ await build({
     ],
     license: "MIT",
     bugs: {
-      url: "https://github.com/upstash/upstash-cli/issues",
+      url: "https://github.com/upstash/cli/issues",
     },
-    homepage: "https://github.com/upstash/upstash-cli#readme",
+    homepage: "https://github.com/upstash/cli#readme",
   },
 });
 Deno.writeTextFileSync(

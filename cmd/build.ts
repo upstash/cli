@@ -34,13 +34,12 @@ await build({
     // package.json properties
     name: "@upstash/cli",
     version,
-    description:
-      "An HTTP/REST based Redis client built on top of Upstash REST API.",
+    description: "CLI for Upstash resources.",
     repository: {
       type: "git",
       url: "git+https://github.com/upstash/cli.git",
     },
-    keywords: ["redis", "database", "serverless", "edge", "upstash"],
+    keywords: ["cli", "redis", "kafka", "serverless", "edge", "upstash"],
     contributors: [
       {
         name: "Andreas Thomas",

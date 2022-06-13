@@ -6,5 +6,4 @@ export type Database = {
   port: number;
 
   region: string;
-  consistent: boolean;
 };

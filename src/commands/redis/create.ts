@@ -26,11 +26,6 @@ export const createCmd = new Command()
     "Set true to enable multizone-replication",
     { default: false },
   )
-  .option(
-    "--consistent=<boolean:boolean>",
-    "Set true to enable strong consistency",
-    { default: false },
-  )
   .example("region", "upstash redis create --name mydb --region=us-east-1")
   .example("global", "upstash redis create --name mydb --region=global")
   .action(async (options): Promise<void> => {
@@ -59,7 +54,6 @@ export const createCmd = new Command()
       database_name: options.name,
       region: options.region,
       multizone: options.multizoneReplication,
-      consistent: options.consistent,
     };
 
     const db = await http.request<Database>({

@@ -84,7 +84,6 @@ Let's create a new redis database:
   password             88ae6392a1084d1186a3da37fb5f5a30
   user_email           andreas@upstash.com
   endpoint             eu1-magnetic-lacewing-37090.upstash.io
-  tls                  true
   edge                 false
   multizone            false
   consistent           false
@@ -94,7 +93,7 @@ Let's create a new redis database:
 
   You can visit your database details page: https://console.upstash.com/redis/a3e25299-132a-45b9-b026-c73f5a807859
 
-  Connect to your database with redis-cli: redis-cli --tls -u redis://88ae6392a1084d1186a3da37fb5f5a30@eu1-magnetic-lacewing-37090.upstash.io:37090
+  Connect to your database with redis-cli: redis-cli -u redis://88ae6392a1084d1186a3da37fb5f5a30@eu1-magnetic-lacewing-37090.upstash.io:37090
 ```
 
 ## Output

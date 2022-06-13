@@ -6,6 +6,5 @@ export type Database = {
   port: number;
 
   region: string;
-  tls: boolean;
   consistent: boolean;
 };

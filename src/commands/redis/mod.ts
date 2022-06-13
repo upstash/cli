@@ -6,7 +6,6 @@ import { getCmd } from "./get.ts";
 import { statsCmd } from "./stats.ts";
 import { resetPasswordCmd } from "./reset_password.ts";
 import { renameCmd } from "./rename.ts";
-import { enableTLSCmd } from "./enable_tls.ts";
 import { enableMultizoneReplicationCmd } from "./enable_multizone_replication.ts";
 import { moveToTeamCmd } from "./move_to_team.ts";
 const redisCmd = new Command()
@@ -19,7 +18,6 @@ const redisCmd = new Command()
   .command("stats", statsCmd)
   .command("rename", renameCmd)
   .command("reset-password", resetPasswordCmd)
-  .command("enable-tls", enableTLSCmd)
   .command("enable-multizone-replication", enableMultizoneReplicationCmd)
   .command("move-to-team", moveToTeamCmd);
 

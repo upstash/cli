@@ -21,17 +21,9 @@ export const createCmd = new Command()
   .option("-r --region <string:region>", "Region of the database", {
     required: true,
   })
-  .option("--tls=<boolean:boolean>", "Set true to enable tls", {
-    default: true,
-  })
   .option(
     "--multizone-replication=<boolean:boolean>",
     "Set true to enable multizone-replication",
-    { default: false },
-  )
-  .option(
-    "--consistent=<boolean:boolean>",
-    "Set true to enable strong consistency",
     { default: false },
   )
   .example("region", "upstash redis create --name mydb --region=us-east-1")
@@ -61,9 +53,7 @@ export const createCmd = new Command()
     const body: Record<string, string | number | boolean | undefined> = {
       database_name: options.name,
       region: options.region,
-      tls: options.tls,
       multizone: options.multizoneReplication,
-      consistent: options.consistent,
     };
 
     const db = await http.request<Database>({
@@ -96,9 +86,7 @@ export const createCmd = new Command()
     console.log(
       "Connect to your database with redis-cli: " +
         cliffy.colors.yellow(
-          `redis-cli${
-            db.tls ? " --tls" : ""
-          } -u redis://${db.password}@${db.endpoint}:${db.port}`,
+          `redis-cli --tls -u redis://${db.password}@${db.endpoint}:${db.port}`,
         ),
     );
   });

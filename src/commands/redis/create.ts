@@ -86,7 +86,7 @@ export const createCmd = new Command()
     console.log(
       "Connect to your database with redis-cli: " +
         cliffy.colors.yellow(
-          `redis-cli -u redis://${db.password}@${db.endpoint}:${db.port}`,
+          `redis-cli --tls -u redis://${db.password}@${db.endpoint}:${db.port}`,
         ),
     );
   });

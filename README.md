@@ -22,7 +22,7 @@ It will be added as `upstash` to your system's path.
 ## Compiled binaries:
 
 `upstash` is also available from the
-[releases page](https://github.com/upstash/upstash-cli/releases/latest) compiled
+[releases page](https://github.com/upstash/cli/releases/latest) compiled
 for windows, linux and mac (both intel and m1).
 
 # Usage

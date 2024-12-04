@@ -26,7 +26,7 @@ jobs:
       - run: echo "$HOME/.deno/bin" > $GITHUB_PATH
 
       - name: Build
-        run: deno --unstable run -A ./cmd/build.ts $VERSION
+        run: deno run -A ./cmd/build.ts $VERSION
 
       - name: Publish
         if: "!github.event.release.prerelease"
@@ -63,7 +63,7 @@ jobs:
       - run: echo "$HOME/.deno/bin" > $GITHUB_PATH
 
       - name: compile
-        run: deno --unstable compile --allow-env --allow-read --allow-write --allow-net --target=${{ matrix.arch }} --output=./bin/upstash_${{ matrix.arch}} ./src/mod.ts
+        run: deno compile --allow-env --allow-read --allow-write --allow-net --target=${{ matrix.arch }} --output=./bin/upstash_${{ matrix.arch}} ./src/mod.ts
 
       - name: upload
         run: gh release upload ${GITHUB_REF#refs/*/} ./bin/*

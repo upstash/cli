@@ -22,8 +22,8 @@ It will be added as `upstash` to your system's path.
 ## Compiled binaries:
 
 `upstash` is also available from the
-[releases page](https://github.com/upstash/cli/releases/latest) compiled
-for windows, linux and mac (both intel and m1).
+[releases page](https://github.com/upstash/cli/releases/latest) compiled for
+windows, linux and mac (both intel and m1).
 
 # Usage
 
@@ -47,7 +47,6 @@ for windows, linux and mac (both intel and m1).
 
     auth   - Login and logout                   
     redis  - Manage redis database instances    
-    kafka  - Manage kafka clusters and topics   
     team   - Manage your teams and their members
 
   Environment variables:

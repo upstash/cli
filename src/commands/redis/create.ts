@@ -34,12 +34,12 @@ export const createCmd = new Command()
     "Read regions of the database",
     {
       required: false,
-    }
+    },
   )
   .example("global", "upstash redis create --name mydb --region=us-east-1")
   .example(
-    "global-replication",
-    "upstash redis create --name mydb --region=us-east-1 --read-regions=us-west-1 eu-west-1"
+    "with replication",
+    "upstash redis create --name mydb --region=us-east-1 --read-regions=us-west-1 eu-west-1",
   )
   .action(async (options): Promise<void> => {
     const authorization = await parseAuth(options);
@@ -63,7 +63,10 @@ export const createCmd = new Command()
     //     })),
     //   })) as Region;
     // }
-    const body: Record<string, string | number | boolean | undefined> = {
+    const body: Record<
+      string,
+      string | number | boolean | undefined | string[]
+    > = {
       name: options.name,
       region: "global",
       primary_region: options.region,
@@ -88,8 +91,8 @@ export const createCmd = new Command()
     console.log();
     console.log(
       cliffy.Table.from(
-        Object.entries(db).map(([k, v]) => [k.toString(), v.toString()])
-      ).toString()
+        Object.entries(db).map(([k, v]) => [k.toString(), v.toString()]),
+      ).toString(),
     );
     console.log();
     console.log();
@@ -97,14 +100,14 @@ export const createCmd = new Command()
     console.log(
       "You can visit your database details page: " +
         cliffy.colors.yellow(
-          "https://console.upstash.com/redis/" + db.database_id
-        )
+          "https://console.upstash.com/redis/" + db.database_id,
+        ),
     );
     console.log();
     console.log(
       "Connect to your database with redis-cli: " +
         cliffy.colors.yellow(
-          `redis-cli --tls -u redis://${db.password}@${db.endpoint}:${db.port}`
-        )
+          `redis-cli --tls -u redis://${db.password}@${db.endpoint}:${db.port}`,
+        ),
     );
   });

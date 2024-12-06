@@ -1,7 +1,6 @@
 import { authCmd } from "./commands/auth/mod.ts";
 import { redisCmd } from "./commands/redis/mod.ts";
 import { teamCmd } from "./commands/team/mod.ts";
-import { kafkaCmd } from "./commands/kafka/mod.ts";
 import { Command } from "./util/command.ts";
 import { cliffy } from "./deps.ts";
 import { VERSION } from "./version.ts";
@@ -31,7 +30,6 @@ const cmd = new Command()
    */
   .command("auth", authCmd as unknown as Command)
   .command("redis", redisCmd as unknown as Command)
-  .command("kafka", kafkaCmd as unknown as Command)
   .command("team", teamCmd as unknown as Command);
 cmd.reset().action(() => {
   cmd.showHelp();

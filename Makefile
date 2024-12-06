@@ -13,8 +13,7 @@ build-node: fmt
 
 
 build-bin: fmt
-	deno --unstable \
-		compile \
+	deno compile \
 		--allow-env \
 		--allow-read \
 		--allow-write \

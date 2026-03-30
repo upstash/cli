@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, printTable, handleError } from "../../output.js";
-import type { Team } from "../../types.js";
+import type { QStashUser } from "../../types.js";
 
 interface Flags {
   email?: string;
@@ -10,28 +10,28 @@ interface Flags {
   json?: boolean;
 }
 
-export function registerTeamList(team: Command): void {
-  team
+export function registerQStashList(qstash: Command): void {
+  qstash
     .command("list")
-    .description("List all teams")
+    .description("List all QStash instances (id and region per deployment)")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .option("--json", "Output as JSON")
     .action(async (flags: Flags) => {
       const auth = resolveAuth(flags);
       try {
-        const teams = await request<Team[]>(auth, "GET", "/v2/teams");
+        const users = await request<QStashUser[]>(auth, "GET", "/v2/qstash/users");
         if (flags.json) {
-          printJSON(teams);
+          printJSON(users);
           return;
         }
-        if (teams.length === 0) {
-          console.log("No teams found.");
+        if (users.length === 0) {
+          console.log("No QStash instances found.");
           return;
         }
         printTable(
-          ["ID", "NAME", "COPY_CC"],
-          teams.map((t) => [t.team_id, t.team_name, t.copy_cc ? "yes" : "no"]),
+          ["ID", "REGION", "STATE", "TYPE"],
+          users.map((u) => [u.id, u.region ?? "", u.state ?? "", u.type ?? ""]),
         );
       } catch (err) {
         handleError(err, flags.json ?? false);

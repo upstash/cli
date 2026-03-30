@@ -1,49 +1,42 @@
-import { cliffy } from "../../deps.ts";
-import { Command } from "../../util/command.ts";
-import { parseAuth } from "../../util/auth.ts";
-import { http } from "../../util/http.ts";
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON, printKeyValue, handleError } from "../../output.js";
+import type { Team } from "../../types.js";
 
-export const createCmd = new Command()
-  .name("create")
-  .description("Create a new team")
-  .option("-n --name=<string:string>", "Name of the database", {
-    required: true,
-  })
-  .option(
-    "--copy-credit-card=<boolean:boolean>",
-    "Set true to copy the credit card information to the new team",
-    { default: false },
-  )
-  .action(async (options): Promise<void> => {
-    const authorization = await parseAuth(options);
+interface Flags {
+  email?: string;
+  apiKey?: string;
+  json?: boolean;
+  name: string;
+  copyCc?: boolean;
+}
 
-    // if (!options.name) {
-    //   if (options.ci) {
-    //     throw new cliffy.ValidationError("name");
-    //   }
-    //   options.name = await cliffy.Input.prompt("Set a name for your team");
-    // }
-
-    const body: Record<string, string | number | boolean | undefined> = {
-      team_name: options.name,
-      copy_cc: options.copyCreditCard,
-    };
-
-    const team = await http.request<Response>({
-      method: "POST",
-      authorization,
-      path: ["v2", "team"],
-      body,
+export function registerTeamCreate(team: Command): void {
+  team
+    .command("create")
+    .description("Create a new team")
+    .requiredOption("--name <name>", "Team name")
+    .option("--copy-cc", "Copy existing credit card information to the team")
+    .option("--email <email>", "Upstash email")
+    .option("--api-key <key>", "Upstash API key")
+    .option("--json", "Output as JSON")
+    .action(async (flags: Flags) => {
+      const auth = resolveAuth(flags);
+      try {
+        const t = await request<Team>(auth, "POST", "/v2/team", {
+          team_name: flags.name,
+          copy_cc: flags.copyCc ?? false,
+        });
+        if (flags.json) {
+          printJSON(t);
+          return;
+        }
+        console.log(`Team '${t.team_name}' created.`);
+        console.log();
+        printKeyValue(t as unknown as Record<string, unknown>);
+      } catch (err) {
+        handleError(err, flags.json ?? false);
+      }
     });
-    if (options.json) {
-      console.log(JSON.stringify(team, null, 2));
-      return;
-    }
-    console.log(cliffy.colors.brightGreen("Team has been created"));
-    console.log();
-    console.log(
-      cliffy.Table.from(
-        Object.entries(team).map(([k, v]) => [k.toString(), v.toString()]),
-      ).toString(),
-    );
-  });
+}

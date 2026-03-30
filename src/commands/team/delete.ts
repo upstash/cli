@@ -1,44 +1,44 @@
-import { cliffy } from "../../deps.ts";
-import { Command } from "../../util/command.ts";
-import { parseAuth } from "../../util/auth.ts";
-import { http } from "../../util/http.ts";
-export const deleteCmd = new Command()
-  .name("delete")
-  .description("delete a team")
-  .option("--id <string:string>", "The uuid of your database")
-  .example("Delete", `upstash team delete f860e7e2-27b8-4166-90d5-ea41e90b4809`)
-  .action(async (options): Promise<void> => {
-    const authorization = await parseAuth(options);
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON, handleError } from "../../output.js";
 
-    // if (!options.id) {
-    //   if (options.ci) {
-    //     throw new cliffy.ValidationError("id");
-    //   }
-    //   const teams = await http.request<
-    //     { team_name: string; team_id: string }[]
-    //   >({
-    //     method: "GET",
-    //     authorization,
-    //     path: ["v2", "teams"],
-    //   });
-    //   options.id = await cliffy.Select.prompt({
-    //     message: "Select a team to delete",
-    //     options: teams.map(({ team_name, team_id }) => ({
-    //       name: team_name,
-    //       value: team_id,
-    //     })),
-    //   });
-    // }
+interface Flags {
+  email?: string;
+  apiKey?: string;
+  json?: boolean;
+  dryRun?: boolean;
+}
 
-    await http.request<Response>({
-      method: "DELETE",
-      authorization,
-      path: ["v2", "team", options.id!],
+export function registerTeamDelete(team: Command): void {
+  team
+    .command("delete <team-id>")
+    .description("Delete a team")
+    .option("--email <email>", "Upstash email")
+    .option("--api-key <key>", "Upstash API key")
+    .option("--json", "Output as JSON")
+    .option("--dry-run", "Preview the action without executing it")
+    .action(async (teamId: string, flags: Flags) => {
+      if (flags.dryRun) {
+        const preview = { action: "delete", team_id: teamId, dry_run: true };
+        if (flags.json) {
+          printJSON(preview);
+          return;
+        }
+        console.log(`Dry run: would delete team ${teamId}`);
+        return;
+      }
+
+      const auth = resolveAuth(flags);
+      try {
+        await request(auth, "DELETE", `/v2/team/${teamId}`);
+        if (flags.json) {
+          printJSON({ deleted: true, team_id: teamId });
+          return;
+        }
+        console.log(`Team ${teamId} deleted.`);
+      } catch (err) {
+        handleError(err, flags.json ?? false);
+      }
     });
-    if (options.json) {
-      console.log(JSON.stringify({ ok: true }, null, 2));
-      return;
-    }
-    console.log(cliffy.colors.brightGreen("Team has been deleted"));
-    console.log();
-  });
+}

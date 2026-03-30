@@ -8,28 +8,28 @@ interface Flags {
   email?: string;
   apiKey?: string;
   json?: boolean;
-  name: string;
 }
 
-export function registerRename(redis: Command): void {
+export function registerResetPassword(redis: Command): void {
   redis
-    .command("rename <database-id>")
-    .description("Rename a Redis database")
-    .requiredOption("--name <name>", "New database name")
+    .command("reset-password <database-id>")
+    .description("Reset the password of a Redis database")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .option("--json", "Output as JSON")
     .action(async (databaseId: string, flags: Flags) => {
       const auth = resolveAuth(flags);
       try {
-        const db = await request<Database>(auth, "POST", `/v2/redis/rename/${databaseId}`, {
-          name: flags.name,
-        });
+        const db = await request<Database>(
+          auth,
+          "POST",
+          `/v2/redis/reset-password/${databaseId}`,
+        );
         if (flags.json) {
           printJSON(db);
           return;
         }
-        console.log(`Database renamed to '${db.database_name}'.`);
+        console.log("Password reset successfully.");
         console.log();
         printKeyValue(db as unknown as Record<string, unknown>);
       } catch (err) {

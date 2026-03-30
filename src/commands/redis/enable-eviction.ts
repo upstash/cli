@@ -9,22 +9,22 @@ interface Flags {
   json?: boolean;
 }
 
-export function registerStats(redis: Command): void {
+export function registerEnableEviction(redis: Command): void {
   redis
-    .command("stats <database-id>")
-    .description("Get usage statistics for a Redis database")
+    .command("enable-eviction <database-id>")
+    .description("Enable key eviction for a Redis database")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .option("--json", "Output as JSON")
     .action(async (databaseId: string, flags: Flags) => {
       const auth = resolveAuth(flags);
       try {
-        const stats = await request<Record<string, unknown>>(
-          auth,
-          "GET",
-          `/v2/redis/stats/${databaseId}`,
-        );
-        printJSON(stats);
+        await request(auth, "POST", `/v2/redis/enable-eviction/${databaseId}`);
+        if (flags.json) {
+          printJSON({ success: true, database_id: databaseId });
+          return;
+        }
+        console.log("Eviction enabled.");
       } catch (err) {
         handleError(err, flags.json ?? false);
       }

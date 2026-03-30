@@ -7,24 +7,29 @@ interface Flags {
   email?: string;
   apiKey?: string;
   json?: boolean;
+  teamId: string;
 }
 
-export function registerStats(redis: Command): void {
+export function registerMoveToTeam(redis: Command): void {
   redis
-    .command("stats <database-id>")
-    .description("Get usage statistics for a Redis database")
+    .command("move-to-team <database-id>")
+    .description("Move a Redis database to a team account")
+    .requiredOption("--team-id <id>", "Target team ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .option("--json", "Output as JSON")
     .action(async (databaseId: string, flags: Flags) => {
       const auth = resolveAuth(flags);
       try {
-        const stats = await request<Record<string, unknown>>(
-          auth,
-          "GET",
-          `/v2/redis/stats/${databaseId}`,
-        );
-        printJSON(stats);
+        await request(auth, "POST", `/v2/redis/move-to-team`, {
+          database_id: databaseId,
+          team_id: flags.teamId,
+        });
+        if (flags.json) {
+          printJSON({ success: true, database_id: databaseId, team_id: flags.teamId });
+          return;
+        }
+        console.log(`Database ${databaseId} moved to team ${flags.teamId}.`);
       } catch (err) {
         handleError(err, flags.json ?? false);
       }

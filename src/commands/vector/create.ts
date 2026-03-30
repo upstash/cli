@@ -1,0 +1,83 @@
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON, printKeyValue, handleError } from "../../output.js";
+import {
+  VECTOR_REGIONS,
+  VECTOR_SIMILARITY_FUNCTIONS,
+  VECTOR_INDEX_TYPES,
+  VECTOR_EMBEDDING_MODELS,
+  VECTOR_SPARSE_MODELS,
+  VECTOR_PLANS,
+} from "../../types.js";
+import type { VectorIndex } from "../../types.js";
+
+interface Flags {
+  email?: string;
+  apiKey?: string;
+  json?: boolean;
+  name: string;
+  region: string;
+  similarityFunction: string;
+  dimensionCount: number;
+  type?: string;
+  embeddingModel?: string;
+  indexType?: string;
+  sparseEmbeddingModel?: string;
+}
+
+export function registerVectorCreate(vector: Command): void {
+  vector
+    .command("create")
+    .description("Create a new vector index")
+    .requiredOption("--name <name>", "Index name")
+    .requiredOption(
+      "--region <region>",
+      `Region. Available: ${VECTOR_REGIONS.join(", ")}`,
+    )
+    .requiredOption(
+      "--similarity-function <fn>",
+      `Similarity function. Available: ${VECTOR_SIMILARITY_FUNCTIONS.join(", ")}`,
+    )
+    .requiredOption("--dimension-count <n>", "Number of dimensions per vector", parseInt)
+    .option(
+      "--type <type>",
+      `Plan type. Available: ${VECTOR_PLANS.join(", ")}`,
+    )
+    .option(
+      "--embedding-model <model>",
+      `Embedding model. Available: ${VECTOR_EMBEDDING_MODELS.join(", ")}`,
+    )
+    .option(
+      "--index-type <type>",
+      `Index type. Available: ${VECTOR_INDEX_TYPES.join(", ")}`,
+    )
+    .option(
+      "--sparse-embedding-model <model>",
+      `Sparse embedding model. Available: ${VECTOR_SPARSE_MODELS.join(", ")}`,
+    )
+    .option("--email <email>", "Upstash email")
+    .option("--api-key <key>", "Upstash API key")
+    .option("--json", "Output as JSON")
+    .action(async (flags: Flags) => {
+      const auth = resolveAuth(flags);
+      try {
+        const idx = await request<VectorIndex>(auth, "POST", "/v2/vector/index", {
+          name: flags.name,
+          region: flags.region,
+          similarity_function: flags.similarityFunction,
+          dimension_count: flags.dimensionCount,
+          type: flags.type,
+          embedding_model: flags.embeddingModel,
+          index_type: flags.indexType,
+          sparse_embedding_model: flags.sparseEmbeddingModel,
+        });
+        if (flags.json) { printJSON(idx); return; }
+        console.log(`Vector index '${idx.name}' created.`);
+        console.log();
+        printKeyValue(idx as unknown as Record<string, unknown>);
+      } catch (err) {
+        handleError(err, flags.json ?? false);
+      }
+    });
+}

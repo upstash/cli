@@ -1,0 +1,30 @@
+{
+  "name": "@upstash/cli",
+  "version": "1.0.0",
+  "description": "Agent-friendly CLI for Upstash",
+  "type": "module",
+  "bin": {
+    "upstash": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["upstash", "cli", "ai-agent", "redis"],
+  "author": "Upstash",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": ["dist"]
+}

@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, printTable, handleError } from "../../output.js";
-import type { Team } from "../../types.js";
+import type { TeamMember } from "../../types.js";
 
 interface Flags {
   email?: string;
@@ -10,28 +10,28 @@ interface Flags {
   json?: boolean;
 }
 
-export function registerTeamList(team: Command): void {
+export function registerTeamMembers(team: Command): void {
   team
-    .command("list")
-    .description("List all teams")
+    .command("members <team-id>")
+    .description("List all members of a team")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .option("--json", "Output as JSON")
-    .action(async (flags: Flags) => {
+    .action(async (teamId: string, flags: Flags) => {
       const auth = resolveAuth(flags);
       try {
-        const teams = await request<Team[]>(auth, "GET", "/v2/teams");
+        const members = await request<TeamMember[]>(auth, "GET", `/v2/teams/${teamId}`);
         if (flags.json) {
-          printJSON(teams);
+          printJSON(members);
           return;
         }
-        if (teams.length === 0) {
-          console.log("No teams found.");
+        if (members.length === 0) {
+          console.log("No members found.");
           return;
         }
         printTable(
-          ["ID", "NAME", "COPY_CC"],
-          teams.map((t) => [t.team_id, t.team_name, t.copy_cc ? "yes" : "no"]),
+          ["EMAIL", "ROLE"],
+          members.map((m) => [m.member_email, m.member_role]),
         );
       } catch (err) {
         handleError(err, flags.json ?? false);

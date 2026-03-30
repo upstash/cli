@@ -16,6 +16,7 @@ import { registerUpdateBudget } from "./update-budget.js";
 import { registerUpdateRegions } from "./update-regions.js";
 import { registerMoveToTeam } from "./move-to-team.js";
 import { registerBackup } from "./backup/index.js";
+import { registerExec } from "./exec.js";
 
 export function registerRedis(program: Command): void {
   const redis = program.command("redis").description("Manage Redis databases");
@@ -37,4 +38,5 @@ export function registerRedis(program: Command): void {
   registerUpdateRegions(redis);
   registerMoveToTeam(redis);
   registerBackup(redis);
+  registerExec(redis);
 }

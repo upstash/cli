@@ -1,7 +1,7 @@
-
-# Upstash CLI — Agent Skill
-
-The same instructions are packaged for VS Code Agent Skills at `.agents/skills/upstash-cli/SKILL.md`.
+---
+name: upstash-cli
+description: Run the Upstash CLI (`upstash`) against the Upstash Developer API for Redis, Vector, Search, QStash, and teams. Use when listing or managing databases, backups, vector/search indexes, QStash instances, team members, stats, or any non-interactive Upstash automation with JSON output and terminal commands.
+---
 
 The Upstash CLI (`upstash`) manages Upstash services via the Upstash Developer API. Every command is non-interactive and always outputs JSON.
 
@@ -11,18 +11,18 @@ The Upstash CLI (`upstash`) manages Upstash services via the Upstash Developer A
 npm i -g @upstash/cli
 ```
 
-From a clone: `npm install`, `npm run build`, then `node dist/cli.js …` or `npm link`.
+From a clone (contributors / unreleased fixes): `npm install`, `npm run build`, then `node dist/cli.js …` or `npm link`.
 
 ## Authentication
 
-Set environment variables before running any command:
+Set environment variables (recommended for agents):
 
 ```bash
 export UPSTASH_EMAIL=you@example.com
 export UPSTASH_API_KEY=your_api_key
 ```
 
-**Agents:** You can use a **read-only** Developer API key in `UPSTASH_API_KEY`. The Developer API then only returns what that key is allowed to see, and only the actions allowed for that key will succeed; anything else fails at the API.
+**Agents:** Prefer a **read-only** Developer API key in `UPSTASH_API_KEY` when you can. The API only returns what that key may access, and only actions permitted for read-only keys succeed; the rest fail at the API.
 
 ## Global Flags
 
@@ -33,7 +33,7 @@ Every command accepts these flags:
 | `--email <email>` | Upstash email (overrides `UPSTASH_EMAIL`) |
 | `--api-key <key>` | Upstash API key (overrides `UPSTASH_API_KEY`) |
 
-**Resource IDs** — scoped commands use `--db-id`, `--index-id`, `--qstash-id`, or `--team-id` followed by the placeholder **`<id>`** (e.g. `--index-id <id>`), including in `--help` output.
+**Resource IDs** — use **`--flag <id>`** (e.g. `--index-id <id>`), same pattern as `--db-id <id>` for Redis.
 
 | Flag | Products |
 |------|----------|

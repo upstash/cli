@@ -3,34 +3,21 @@ import { resolveAuth } from "../../../auth.js";
 import { request } from "../../../client.js";
 import { printJSON, handleError } from "../../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-  name: string;
-}
-
 export function registerBackupCreate(backup: Command): void {
   backup
-    .command("create <database-id>")
+    .command("create")
     .description("Create a backup of a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
     .requiredOption("--name <name>", "Backup name")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (databaseId: string, flags: Flags) => {
+    .action(async (flags: { dbId: string; name: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "POST", `/v2/redis/create-backup/${databaseId}`, {
-          name: flags.name,
-        });
-        if (flags.json) {
-          printJSON({ success: true, database_id: databaseId, name: flags.name });
-          return;
-        }
-        console.log(`Backup '${flags.name}' created.`);
+        const result = await request(auth, "POST", `/v2/redis/create-backup/${flags.dbId}`, { name: flags.name });
+        printJSON(result);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

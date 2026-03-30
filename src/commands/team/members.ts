@@ -1,40 +1,23 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, printTable, handleError } from "../../output.js";
+import { printJSON, handleError } from "../../output.js";
 import type { TeamMember } from "../../types.js";
-
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-}
 
 export function registerTeamMembers(team: Command): void {
   team
-    .command("members <team-id>")
+    .command("members")
     .description("List all members of a team")
+    .requiredOption("--team-id <id>", "Team ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (teamId: string, flags: Flags) => {
+    .action(async (flags: { teamId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        const members = await request<TeamMember[]>(auth, "GET", `/v2/teams/${teamId}`);
-        if (flags.json) {
-          printJSON(members);
-          return;
-        }
-        if (members.length === 0) {
-          console.log("No members found.");
-          return;
-        }
-        printTable(
-          ["EMAIL", "ROLE"],
-          members.map((m) => [m.member_email, m.member_role]),
-        );
+        const members = await request<TeamMember[]>(auth, "GET", `/v2/teams/${flags.teamId}`);
+        printJSON(members);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

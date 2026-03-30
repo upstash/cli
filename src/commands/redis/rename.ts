@@ -1,39 +1,24 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, printKeyValue, handleError } from "../../output.js";
+import { printJSON, handleError } from "../../output.js";
 import type { Database } from "../../types.js";
-
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-  name: string;
-}
 
 export function registerRename(redis: Command): void {
   redis
-    .command("rename <database-id>")
+    .command("rename")
     .description("Rename a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
     .requiredOption("--name <name>", "New database name")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (databaseId: string, flags: Flags) => {
+    .action(async (flags: { dbId: string; name: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        const db = await request<Database>(auth, "POST", `/v2/redis/rename/${databaseId}`, {
-          name: flags.name,
-        });
-        if (flags.json) {
-          printJSON(db);
-          return;
-        }
-        console.log(`Database renamed to '${db.database_name}'.`);
-        console.log();
-        printKeyValue(db as unknown as Record<string, unknown>);
+        const db = await request<Database>(auth, "POST", `/v2/redis/rename/${flags.dbId}`, { name: flags.name });
+        printJSON(db);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

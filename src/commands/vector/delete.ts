@@ -3,30 +3,25 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags { email?: string; apiKey?: string; json?: boolean; dryRun?: boolean }
-
 export function registerVectorDelete(vector: Command): void {
   vector
-    .command("delete <index-id>")
+    .command("delete")
     .description("Delete a vector index")
+    .requiredOption("--index-id <id>", "Vector index ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
     .option("--dry-run", "Preview the action without executing it")
-    .action(async (indexId: string, flags: Flags) => {
+    .action(async (flags: { indexId: string; email?: string; apiKey?: string; dryRun?: boolean }) => {
       if (flags.dryRun) {
-        const preview = { action: "delete", index_id: indexId, dry_run: true };
-        if (flags.json) { printJSON(preview); return; }
-        console.log(`Dry run: would delete vector index ${indexId}`);
+        printJSON({ action: "delete", index_id: flags.indexId, dry_run: true });
         return;
       }
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "DELETE", `/v2/vector/index/${indexId}`);
-        if (flags.json) { printJSON({ deleted: true, index_id: indexId }); return; }
-        console.log(`Vector index ${indexId} deleted.`);
+        await request(auth, "DELETE", `/v2/vector/index/${flags.indexId}`);
+        printJSON({ deleted: true, index_id: flags.indexId });
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

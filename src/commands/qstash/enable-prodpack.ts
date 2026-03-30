@@ -3,23 +3,20 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags { email?: string; apiKey?: string; json?: boolean }
-
 export function registerQStashEnableProdpack(qstash: Command): void {
   qstash
-    .command("enable-prodpack <qstash-id>")
+    .command("enable-prodpack")
     .description("Enable the production pack for a QStash instance")
+    .requiredOption("--qstash-id <id>", "QStash instance ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (qstashId: string, flags: Flags) => {
+    .action(async (flags: { qstashId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "POST", `/v2/qstash/enable-prodpack/${qstashId}`);
-        if (flags.json) { printJSON({ success: true, qstash_id: qstashId }); return; }
-        console.log("Production pack enabled.");
+        const result = await request(auth, "POST", `/v2/qstash/enable-prodpack/${flags.qstashId}`);
+        printJSON(result);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

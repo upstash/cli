@@ -41,6 +41,8 @@ export interface Database {
   consistent?: boolean;
   daily_backup_enabled?: boolean;
   region?: string;
+  rest_token?: string;
+  read_only_rest_token?: string;
   db_max_clients?: number;
   db_memory_threshold?: number;
   db_disk_threshold?: number;

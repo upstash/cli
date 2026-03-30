@@ -3,42 +3,25 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-  dryRun?: boolean;
-}
-
 export function registerDelete(redis: Command): void {
   redis
-    .command("delete <database-id>")
+    .command("delete")
     .description("Delete a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
+    .option("--dry-run", "Preview the action without executing it")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .option("--dry-run", "Preview the action without executing it")
-    .action(async (databaseId: string, flags: Flags) => {
+    .action(async (flags: { dbId: string; dryRun?: boolean; email?: string; apiKey?: string }) => {
       if (flags.dryRun) {
-        const preview = { action: "delete", database_id: databaseId, dry_run: true };
-        if (flags.json) {
-          printJSON(preview);
-          return;
-        }
-        console.log(`Dry run: would delete database ${databaseId}`);
+        printJSON({ action: "delete", database_id: flags.dbId, dry_run: true });
         return;
       }
-
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "DELETE", `/v2/redis/database/${databaseId}`);
-        if (flags.json) {
-          printJSON({ deleted: true, database_id: databaseId });
-          return;
-        }
-        console.log(`Database ${databaseId} deleted.`);
+        await request(auth, "DELETE", `/v2/redis/database/${flags.dbId}`);
+        printJSON({ deleted: true, database_id: flags.dbId });
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

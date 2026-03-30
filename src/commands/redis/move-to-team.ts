@@ -3,35 +3,21 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-  teamId: string;
-}
-
 export function registerMoveToTeam(redis: Command): void {
   redis
-    .command("move-to-team <database-id>")
+    .command("move-to-team")
     .description("Move a Redis database to a team account")
+    .requiredOption("--db-id <id>", "Database ID")
     .requiredOption("--team-id <id>", "Target team ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (databaseId: string, flags: Flags) => {
+    .action(async (flags: { dbId: string; teamId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "POST", `/v2/redis/move-to-team`, {
-          database_id: databaseId,
-          team_id: flags.teamId,
-        });
-        if (flags.json) {
-          printJSON({ success: true, database_id: databaseId, team_id: flags.teamId });
-          return;
-        }
-        console.log(`Database ${databaseId} moved to team ${flags.teamId}.`);
+        const result = await request(auth, "POST", `/v2/redis/move-to-team`, { database_id: flags.dbId, team_id: flags.teamId });
+        printJSON(result);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

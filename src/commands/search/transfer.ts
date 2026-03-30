@@ -3,29 +3,21 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags { email?: string; apiKey?: string; json?: boolean; targetAccount: string }
-
 export function registerSearchTransfer(search: Command): void {
   search
-    .command("transfer <index-id>")
+    .command("transfer")
     .description("Transfer a search index to another team")
-    .requiredOption("--target-account <team-id>", "Target team ID")
+    .requiredOption("--index-id <id>", "Search index ID")
+    .requiredOption("--target-account <id>", "Target team ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (indexId: string, flags: Flags) => {
+    .action(async (flags: { indexId: string; email?: string; apiKey?: string; targetAccount: string }) => {
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "POST", `/v2/search/${indexId}/transfer`, {
-          target_account: flags.targetAccount,
-        });
-        if (flags.json) {
-          printJSON({ success: true, index_id: indexId, target_account: flags.targetAccount });
-          return;
-        }
-        console.log(`Index ${indexId} transferred to team ${flags.targetAccount}.`);
+        const result = await request(auth, "POST", `/v2/search/${flags.indexId}/transfer`, { target_account: flags.targetAccount });
+        printJSON(result);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

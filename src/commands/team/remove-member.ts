@@ -3,15 +3,6 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-  dryRun?: boolean;
-  teamId: string;
-  memberEmail: string;
-}
-
 export function registerTeamRemoveMember(team: Command): void {
   team
     .command("remove-member")
@@ -20,39 +11,18 @@ export function registerTeamRemoveMember(team: Command): void {
     .requiredOption("--member-email <email>", "Email of the member to remove")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
     .option("--dry-run", "Preview the action without executing it")
-    .action(async (flags: Flags) => {
+    .action(async (flags: { email?: string; apiKey?: string; dryRun?: boolean; teamId: string; memberEmail: string }) => {
       if (flags.dryRun) {
-        const preview = {
-          action: "remove-member",
-          team_id: flags.teamId,
-          member_email: flags.memberEmail,
-          dry_run: true,
-        };
-        if (flags.json) {
-          printJSON(preview);
-          return;
-        }
-        console.log(
-          `Dry run: would remove ${flags.memberEmail} from team ${flags.teamId}`,
-        );
+        printJSON({ action: "remove-member", team_id: flags.teamId, member_email: flags.memberEmail, dry_run: true });
         return;
       }
-
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "DELETE", "/v2/teams/member", {
-          team_id: flags.teamId,
-          member_email: flags.memberEmail,
-        });
-        if (flags.json) {
-          printJSON({ removed: true, team_id: flags.teamId, member_email: flags.memberEmail });
-          return;
-        }
-        console.log(`${flags.memberEmail} removed from team ${flags.teamId}.`);
+        await request(auth, "DELETE", "/v2/teams/member", { team_id: flags.teamId, member_email: flags.memberEmail });
+        printJSON({ removed: true, team_id: flags.teamId, member_email: flags.memberEmail });
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

@@ -4,26 +4,21 @@ import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 import { VECTOR_PLANS } from "../../types.js";
 
-interface Flags { email?: string; apiKey?: string; json?: boolean; plan: string }
-
 export function registerVectorSetPlan(vector: Command): void {
   vector
-    .command("set-plan <index-id>")
+    .command("set-plan")
     .description(`Change the plan of a vector index. Plans: ${VECTOR_PLANS.join(", ")}`)
+    .requiredOption("--index-id <id>", "Vector index ID")
     .requiredOption("--plan <plan>", `Target plan (${VECTOR_PLANS.join(", ")})`)
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (indexId: string, flags: Flags) => {
+    .action(async (flags: { indexId: string; email?: string; apiKey?: string; plan: string }) => {
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "POST", `/v2/vector/index/${indexId}/setplan`, {
-          target_plan: flags.plan,
-        });
-        if (flags.json) { printJSON({ success: true, index_id: indexId, plan: flags.plan }); return; }
-        console.log(`Plan changed to '${flags.plan}'.`);
+        const result = await request(auth, "POST", `/v2/vector/index/${flags.indexId}/setplan`, { target_plan: flags.plan });
+        printJSON(result);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

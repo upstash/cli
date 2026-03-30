@@ -1,26 +1,23 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, printKeyValue, handleError } from "../../output.js";
+import { printJSON, handleError } from "../../output.js";
 import type { QStashUser } from "../../types.js";
-
-interface Flags { email?: string; apiKey?: string; json?: boolean }
 
 export function registerQStashGet(qstash: Command): void {
   qstash
-    .command("get <qstash-id>")
+    .command("get")
     .description("Get details of a QStash instance")
+    .requiredOption("--qstash-id <id>", "QStash instance ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (qstashId: string, flags: Flags) => {
+    .action(async (flags: { qstashId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        const q = await request<QStashUser>(auth, "GET", `/v2/qstash/user/${qstashId}`);
-        if (flags.json) { printJSON(q); return; }
-        printKeyValue(q as unknown as Record<string, unknown>);
+        const q = await request<QStashUser>(auth, "GET", `/v2/qstash/user/${flags.qstashId}`);
+        printJSON(q);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

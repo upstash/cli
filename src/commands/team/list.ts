@@ -1,14 +1,8 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, printTable, handleError } from "../../output.js";
+import { printJSON, handleError } from "../../output.js";
 import type { Team } from "../../types.js";
-
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-}
 
 export function registerTeamList(team: Command): void {
   team
@@ -16,25 +10,13 @@ export function registerTeamList(team: Command): void {
     .description("List all teams")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (flags: Flags) => {
+    .action(async (flags: { email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
         const teams = await request<Team[]>(auth, "GET", "/v2/teams");
-        if (flags.json) {
-          printJSON(teams);
-          return;
-        }
-        if (teams.length === 0) {
-          console.log("No teams found.");
-          return;
-        }
-        printTable(
-          ["ID", "NAME", "COPY_CC"],
-          teams.map((t) => [t.team_id, t.team_name, t.copy_cc ? "yes" : "no"]),
-        );
+        printJSON(teams);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

@@ -1,34 +1,24 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, printKeyValue, handleError } from "../../output.js";
+import { printJSON, handleError } from "../../output.js";
 import type { VectorIndex } from "../../types.js";
-
-interface Flags { email?: string; apiKey?: string; json?: boolean; name: string }
 
 export function registerVectorRename(vector: Command): void {
   vector
-    .command("rename <index-id>")
+    .command("rename")
     .description("Rename a vector index")
+    .requiredOption("--index-id <id>", "Vector index ID")
     .requiredOption("--name <name>", "New index name")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (indexId: string, flags: Flags) => {
+    .action(async (flags: { indexId: string; email?: string; apiKey?: string; name: string }) => {
       const auth = resolveAuth(flags);
       try {
-        const idx = await request<VectorIndex>(
-          auth,
-          "POST",
-          `/v2/vector/index/${indexId}/rename`,
-          { name: flags.name },
-        );
-        if (flags.json) { printJSON(idx); return; }
-        console.log(`Index renamed to '${idx.name}'.`);
-        console.log();
-        printKeyValue(idx as unknown as Record<string, unknown>);
+        const idx = await request<VectorIndex>(auth, "POST", `/v2/vector/index/${flags.indexId}/rename`, { name: flags.name });
+        printJSON(idx);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

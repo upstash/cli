@@ -3,42 +3,25 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-  dryRun?: boolean;
-}
-
 export function registerTeamDelete(team: Command): void {
   team
-    .command("delete <team-id>")
+    .command("delete")
     .description("Delete a team")
+    .requiredOption("--team-id <id>", "Team ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
     .option("--dry-run", "Preview the action without executing it")
-    .action(async (teamId: string, flags: Flags) => {
+    .action(async (flags: { teamId: string; email?: string; apiKey?: string; dryRun?: boolean }) => {
       if (flags.dryRun) {
-        const preview = { action: "delete", team_id: teamId, dry_run: true };
-        if (flags.json) {
-          printJSON(preview);
-          return;
-        }
-        console.log(`Dry run: would delete team ${teamId}`);
+        printJSON({ action: "delete", team_id: flags.teamId, dry_run: true });
         return;
       }
-
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "DELETE", `/v2/team/${teamId}`);
-        if (flags.json) {
-          printJSON({ deleted: true, team_id: teamId });
-          return;
-        }
-        console.log(`Team ${teamId} deleted.`);
+        await request(auth, "DELETE", `/v2/team/${flags.teamId}`);
+        printJSON({ deleted: true, team_id: flags.teamId });
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

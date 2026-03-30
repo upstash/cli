@@ -3,30 +3,20 @@ import { resolveAuth } from "../../../auth.js";
 import { request } from "../../../client.js";
 import { printJSON, handleError } from "../../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-}
-
 export function registerDisableDaily(backup: Command): void {
   backup
-    .command("disable-daily <database-id>")
+    .command("disable-daily")
     .description("Disable daily automatic backups for a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (databaseId: string, flags: Flags) => {
+    .action(async (flags: { dbId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        await request(auth, "POST", `/v2/redis/disable-dailybackup/${databaseId}`);
-        if (flags.json) {
-          printJSON({ success: true, database_id: databaseId });
-          return;
-        }
-        console.log("Daily backup disabled.");
+        const result = await request(auth, "POST", `/v2/redis/disable-dailybackup/${flags.dbId}`);
+        printJSON(result);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

@@ -3,30 +3,20 @@ import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
 import { printJSON, handleError } from "../../output.js";
 
-interface Flags {
-  email?: string;
-  apiKey?: string;
-  json?: boolean;
-}
-
 export function registerStats(redis: Command): void {
   redis
-    .command("stats <database-id>")
+    .command("stats")
     .description("Get usage statistics for a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (databaseId: string, flags: Flags) => {
+    .action(async (flags: { dbId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
       try {
-        const stats = await request<Record<string, unknown>>(
-          auth,
-          "GET",
-          `/v2/redis/stats/${databaseId}`,
-        );
+        const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/redis/stats/${flags.dbId}`);
         printJSON(stats);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

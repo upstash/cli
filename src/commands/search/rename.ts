@@ -1,34 +1,24 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, printKeyValue, handleError } from "../../output.js";
+import { printJSON, handleError } from "../../output.js";
 import type { SearchIndex } from "../../types.js";
-
-interface Flags { email?: string; apiKey?: string; json?: boolean; name: string }
 
 export function registerSearchRename(search: Command): void {
   search
-    .command("rename <index-id>")
+    .command("rename")
     .description("Rename a search index")
+    .requiredOption("--index-id <id>", "Search index ID")
     .requiredOption("--name <name>", "New index name")
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
-    .option("--json", "Output as JSON")
-    .action(async (indexId: string, flags: Flags) => {
+    .action(async (flags: { indexId: string; email?: string; apiKey?: string; name: string }) => {
       const auth = resolveAuth(flags);
       try {
-        const idx = await request<SearchIndex>(
-          auth,
-          "POST",
-          `/v2/search/${indexId}/rename`,
-          { name: flags.name },
-        );
-        if (flags.json) { printJSON(idx); return; }
-        console.log(`Index renamed to '${idx.name}'.`);
-        console.log();
-        printKeyValue(idx as unknown as Record<string, unknown>);
+        const idx = await request<SearchIndex>(auth, "POST", `/v2/search/${flags.indexId}/rename`, { name: flags.name });
+        printJSON(idx);
       } catch (err) {
-        handleError(err, flags.json ?? false);
+        handleError(err);
       }
     });
 }

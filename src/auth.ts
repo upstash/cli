@@ -9,7 +9,7 @@ export function resolveAuth(flags: { email?: string; apiKey?: string }): Auth {
 
   if (!email || !apiKey) {
     console.error(
-      JSON.stringify({ error: "Authentication required. Set UPSTASH_EMAIL and UPSTASH_API_KEY environment variables." }),
+      JSON.stringify({ error: "Authentication required. Provide credentials via --email and --api-key flags or set UPSTASH_EMAIL and UPSTASH_API_KEY environment variables." }),
     );
     process.exit(1);
   }

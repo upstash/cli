@@ -12,6 +12,9 @@ export function registerQStashUpdateBudget(qstash: Command): void {
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { qstashId: string; email?: string; apiKey?: string; budget: number }) => {
+      if (!Number.isFinite(flags.budget) || !Number.isInteger(flags.budget) || flags.budget < 0) {
+        handleError(new Error(`Invalid --budget: "${flags.budget}". Must be a non-negative integer (dollars).`));
+      }
       const auth = resolveAuth(flags);
       try {
         const result = await request(auth, "PATCH", `/v2/qstash/update-budget/${flags.qstashId}`, { budget: flags.budget });

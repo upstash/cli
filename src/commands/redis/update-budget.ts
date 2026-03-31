@@ -12,6 +12,9 @@ export function registerUpdateBudget(redis: Command): void {
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { dbId: string; budget: number; email?: string; apiKey?: string }) => {
+      if (!Number.isFinite(flags.budget) || !Number.isInteger(flags.budget) || flags.budget < 0) {
+        handleError(new Error(`Invalid --budget: "${flags.budget}". Must be a non-negative integer (cents).`));
+      }
       const auth = resolveAuth(flags);
       try {
         const result = await request(auth, "PATCH", `/v2/redis/update-budget/${flags.dbId}`, { budget: flags.budget });

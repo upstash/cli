@@ -52,7 +52,8 @@ function parseCommand(input: string): string[] {
   let inDouble = false;
 
   for (let i = 0; i < input.length; i++) {
-    const ch = input[i]!;
+    const ch = input[i];
+    if (ch === undefined) break;
 
     if (ch === "'" && !inDouble) {
       inSingle = !inSingle;

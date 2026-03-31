@@ -16,8 +16,7 @@ export function registerTeamAddMember(team: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string; teamId: string; memberEmail: string; role: string }) => {
       if (!(TEAM_MEMBER_ROLES as readonly string[]).includes(flags.role)) {
-        console.error(JSON.stringify({ error: `Invalid role '${flags.role}'. Valid roles: ${TEAM_MEMBER_ROLES.join(", ")}` }));
-        process.exit(1);
+        handleError(new Error(`Invalid role '${flags.role}'. Valid roles: ${TEAM_MEMBER_ROLES.join(", ")}`));
       }
       const auth = resolveAuth(flags);
       try {

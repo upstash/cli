@@ -14,7 +14,7 @@ export function registerQStashStats(qstash: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { qstashId: string; email?: string; apiKey?: string; period?: string }) => {
       const auth = resolveAuth(flags);
-      const qs = flags.period ? `?period=${flags.period}` : "";
+      const qs = flags.period ? `?period=${encodeURIComponent(flags.period)}` : "";
       try {
         const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/qstash/stats/${flags.qstashId}${qs}`);
         printJSON(stats);

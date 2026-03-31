@@ -29,7 +29,7 @@ export function registerVectorStats(vector: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { indexId: string; email?: string; apiKey?: string; period?: string }) => {
       const auth = resolveAuth(flags);
-      const qs = flags.period ? `?period=${flags.period}` : "";
+      const qs = flags.period ? `?period=${encodeURIComponent(flags.period)}` : "";
       try {
         const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/vector/index/${flags.indexId}/stats${qs}`);
         printJSON(stats);

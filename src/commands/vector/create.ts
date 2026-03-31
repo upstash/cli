@@ -20,6 +20,9 @@ export function registerVectorCreate(vector: Command): void {
     .option("--email <email>", "Upstash email")
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string; name: string; region: string; similarityFunction: string; dimensionCount: number; type?: string; embeddingModel?: string; indexType?: string; sparseEmbeddingModel?: string }) => {
+      if (!Number.isFinite(flags.dimensionCount) || !Number.isInteger(flags.dimensionCount) || flags.dimensionCount < 0) {
+        handleError(new Error(`Invalid --dimension-count: "${flags.dimensionCount}". Must be a non-negative integer.`));
+      }
       const auth = resolveAuth(flags);
       try {
         const idx = await request<VectorIndex>(auth, "POST", "/v2/vector/index", {

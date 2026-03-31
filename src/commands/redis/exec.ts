@@ -45,7 +45,7 @@ export function registerExec(redis: Command): void {
     });
 }
 
-function parseCommand(input: string): string[] {
+export function parseCommand(input: string): string[] {
   const args: string[] = [];
   let current = "";
   let inSingle = false;

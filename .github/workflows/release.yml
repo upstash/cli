@@ -5,6 +5,10 @@ on:
     types:
       - published
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   npm:
     name: Release on npm
@@ -14,19 +18,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
 
-      - name: Publish
-        if: "!github.event.release.prerelease"
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish release candidate
         if: github.event.release.prerelease
-        run: npm publish --access public --tag next
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --tag next --provenance
+
+      - name: Publish
+        if: "!github.event.release.prerelease"
+        run: npm publish --access public --provenance

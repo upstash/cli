@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import type { VectorIndex } from "../../types.js";
 
 export function registerVectorList(vector: Command): void {
@@ -12,11 +12,7 @@ export function registerVectorList(vector: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const indexes = await request<VectorIndex[]>(auth, "GET", "/v2/vector/index");
-        printJSON(indexes);
-      } catch (err) {
-        handleError(err);
-      }
+      const indexes = await request<VectorIndex[]>(auth, "GET", "/v2/vector/index");
+      printJSON(indexes);
     });
 }

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import type { VectorIndex } from "../../types.js";
 
 export function registerVectorRename(vector: Command): void {
@@ -14,11 +14,7 @@ export function registerVectorRename(vector: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { indexId: string; email?: string; apiKey?: string; name: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const idx = await request<VectorIndex>(auth, "POST", `/v2/vector/index/${flags.indexId}/rename`, { name: flags.name });
-        printJSON(idx);
-      } catch (err) {
-        handleError(err);
-      }
+      const idx = await request<VectorIndex>(auth, "POST", `/v2/vector/index/${flags.indexId}/rename`, { name: flags.name });
+      printJSON(idx);
     });
 }

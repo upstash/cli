@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerStats(redis: Command): void {
   redis
@@ -12,11 +12,7 @@ export function registerStats(redis: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { dbId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/redis/stats/${flags.dbId}`);
-        printJSON(stats);
-      } catch (err) {
-        handleError(err);
-      }
+      const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/redis/stats/${flags.dbId}`);
+      printJSON(stats);
     });
 }

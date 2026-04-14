@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import { VECTOR_REGIONS, VECTOR_SIMILARITY_FUNCTIONS, VECTOR_INDEX_TYPES, VECTOR_EMBEDDING_MODELS, VECTOR_SPARSE_MODELS, VECTOR_PLANS } from "../../types.js";
 import type { VectorIndex } from "../../types.js";
 
@@ -21,23 +21,19 @@ export function registerVectorCreate(vector: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string; name: string; region: string; similarityFunction: string; dimensionCount: number; type?: string; embeddingModel?: string; indexType?: string; sparseEmbeddingModel?: string }) => {
       if (!Number.isFinite(flags.dimensionCount) || !Number.isInteger(flags.dimensionCount) || flags.dimensionCount < 0) {
-        handleError(new Error(`Invalid --dimension-count: "${flags.dimensionCount}". Must be a non-negative integer.`));
+      throw new Error(`Invalid --dimension-count: "${flags.dimensionCount}". Must be a non-negative integer.`);
       }
       const auth = resolveAuth(flags);
-      try {
-        const idx = await request<VectorIndex>(auth, "POST", "/v2/vector/index", {
-          name: flags.name,
-          region: flags.region,
-          similarity_function: flags.similarityFunction,
-          dimension_count: flags.dimensionCount,
-          type: flags.type,
-          embedding_model: flags.embeddingModel,
-          index_type: flags.indexType,
-          sparse_embedding_model: flags.sparseEmbeddingModel,
-        });
-        printJSON(idx);
-      } catch (err) {
-        handleError(err);
-      }
+      const idx = await request<VectorIndex>(auth, "POST", "/v2/vector/index", {
+        name: flags.name,
+        region: flags.region,
+        similarity_function: flags.similarityFunction,
+        dimension_count: flags.dimensionCount,
+        type: flags.type,
+        embedding_model: flags.embeddingModel,
+        index_type: flags.indexType,
+        sparse_embedding_model: flags.sparseEmbeddingModel,
+      });
+      printJSON(idx);
     });
 }

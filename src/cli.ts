@@ -7,6 +7,7 @@ import { registerTeam } from "./commands/team/index.js";
 import { registerVector } from "./commands/vector/index.js";
 import { registerSearch } from "./commands/search/index.js";
 import { registerQStash } from "./commands/qstash/index.js";
+import { handleError } from "./output.js";
 
 const program = new Command();
 
@@ -21,7 +22,4 @@ registerVector(program);
 registerSearch(program);
 registerQStash(program);
 
-program.parseAsync().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+program.parseAsync().catch(handleError);

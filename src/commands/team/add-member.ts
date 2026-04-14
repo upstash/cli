@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import { TEAM_MEMBER_ROLES } from "../../types.js";
 import type { TeamMember } from "../../types.js";
 
@@ -16,18 +16,14 @@ export function registerTeamAddMember(team: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string; teamId: string; memberEmail: string; role: string }) => {
       if (!(TEAM_MEMBER_ROLES as readonly string[]).includes(flags.role)) {
-        handleError(new Error(`Invalid role '${flags.role}'. Valid roles: ${TEAM_MEMBER_ROLES.join(", ")}`));
+      throw new Error(`Invalid role '${flags.role}'. Valid roles: ${TEAM_MEMBER_ROLES.join(", ")}`);
       }
       const auth = resolveAuth(flags);
-      try {
-        const member = await request<TeamMember>(auth, "POST", "/v2/teams/member", {
-          team_id: flags.teamId,
-          member_email: flags.memberEmail,
-          member_role: flags.role,
-        });
-        printJSON(member);
-      } catch (err) {
-        handleError(err);
-      }
+      const member = await request<TeamMember>(auth, "POST", "/v2/teams/member", {
+        team_id: flags.teamId,
+        member_email: flags.memberEmail,
+        member_role: flags.role,
+      });
+      printJSON(member);
     });
 }

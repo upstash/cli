@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import { STATS_PERIODS } from "../../types.js";
 
 export function registerVectorStats(vector: Command): void {
@@ -12,12 +12,8 @@ export function registerVectorStats(vector: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const stats = await request<Record<string, unknown>>(auth, "GET", "/v2/vector/index/stats");
-        printJSON(stats);
-      } catch (err) {
-        handleError(err);
-      }
+      const stats = await request<Record<string, unknown>>(auth, "GET", "/v2/vector/index/stats");
+      printJSON(stats);
     });
 
   vector
@@ -30,11 +26,7 @@ export function registerVectorStats(vector: Command): void {
     .action(async (flags: { indexId: string; email?: string; apiKey?: string; period?: string }) => {
       const auth = resolveAuth(flags);
       const qs = flags.period ? `?period=${encodeURIComponent(flags.period)}` : "";
-      try {
-        const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/vector/index/${flags.indexId}/stats${qs}`);
-        printJSON(stats);
-      } catch (err) {
-        handleError(err);
-      }
+      const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/vector/index/${flags.indexId}/stats${qs}`);
+      printJSON(stats);
     });
 }

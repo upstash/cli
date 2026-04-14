@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerQStashUpdateBudget(qstash: Command): void {
   qstash
@@ -13,14 +13,10 @@ export function registerQStashUpdateBudget(qstash: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { qstashId: string; email?: string; apiKey?: string; budget: number }) => {
       if (!Number.isFinite(flags.budget) || !Number.isInteger(flags.budget) || flags.budget < 0) {
-        handleError(new Error(`Invalid --budget: "${flags.budget}". Must be a non-negative integer (dollars).`));
+      throw new Error(`Invalid --budget: "${flags.budget}". Must be a non-negative integer (dollars).`);
       }
       const auth = resolveAuth(flags);
-      try {
-        const result = await request(auth, "PATCH", `/v2/qstash/update-budget/${flags.qstashId}`, { budget: flags.budget });
-        printJSON(result);
-      } catch (err) {
-        handleError(err);
-      }
+      const result = await request(auth, "PATCH", `/v2/qstash/update-budget/${flags.qstashId}`, { budget: flags.budget });
+      printJSON(result);
     });
 }

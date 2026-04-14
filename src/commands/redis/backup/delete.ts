@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../../auth.js";
 import { request } from "../../../client.js";
-import { printJSON, handleError } from "../../../output.js";
+import { printJSON } from "../../../output.js";
 
 export function registerBackupDelete(backup: Command): void {
   backup
@@ -18,11 +18,7 @@ export function registerBackupDelete(backup: Command): void {
         return;
       }
       const auth = resolveAuth(flags);
-      try {
-        await request(auth, "DELETE", `/v2/redis/delete-backup/${flags.dbId}/${flags.backupId}`);
-        printJSON({ deleted: true, backup_id: flags.backupId });
-      } catch (err) {
-        handleError(err);
-      }
+      await request(auth, "DELETE", `/v2/redis/delete-backup/${flags.dbId}/${flags.backupId}`);
+      printJSON({ deleted: true, backup_id: flags.backupId });
     });
 }

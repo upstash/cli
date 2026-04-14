@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import type { Team } from "../../types.js";
 
 export function registerTeamList(team: Command): void {
@@ -12,11 +12,7 @@ export function registerTeamList(team: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const teams = await request<Team[]>(auth, "GET", "/v2/teams");
-        printJSON(teams);
-      } catch (err) {
-        handleError(err);
-      }
+      const teams = await request<Team[]>(auth, "GET", "/v2/teams");
+      printJSON(teams);
     });
 }

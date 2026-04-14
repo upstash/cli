@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerDelete(redis: Command): void {
   redis
@@ -17,11 +17,7 @@ export function registerDelete(redis: Command): void {
         return;
       }
       const auth = resolveAuth(flags);
-      try {
-        await request(auth, "DELETE", `/v2/redis/database/${flags.dbId}`);
-        printJSON({ deleted: true, database_id: flags.dbId });
-      } catch (err) {
-        handleError(err);
-      }
+      await request(auth, "DELETE", `/v2/redis/database/${flags.dbId}`);
+      printJSON({ deleted: true, database_id: flags.dbId });
     });
 }

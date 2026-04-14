@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import { STATS_PERIODS } from "../../types.js";
 
 export function registerQStashStats(qstash: Command): void {
@@ -15,11 +15,7 @@ export function registerQStashStats(qstash: Command): void {
     .action(async (flags: { qstashId: string; email?: string; apiKey?: string; period?: string }) => {
       const auth = resolveAuth(flags);
       const qs = flags.period ? `?period=${encodeURIComponent(flags.period)}` : "";
-      try {
-        const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/qstash/stats/${flags.qstashId}${qs}`);
-        printJSON(stats);
-      } catch (err) {
-        handleError(err);
-      }
+      const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/qstash/stats/${flags.qstashId}${qs}`);
+      printJSON(stats);
     });
 }

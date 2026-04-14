@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerTeamRemoveMember(team: Command): void {
   team
@@ -18,11 +18,7 @@ export function registerTeamRemoveMember(team: Command): void {
         return;
       }
       const auth = resolveAuth(flags);
-      try {
-        await request(auth, "DELETE", "/v2/teams/member", { team_id: flags.teamId, member_email: flags.memberEmail });
-        printJSON({ removed: true, team_id: flags.teamId, member_email: flags.memberEmail });
-      } catch (err) {
-        handleError(err);
-      }
+      await request(auth, "DELETE", "/v2/teams/member", { team_id: flags.teamId, member_email: flags.memberEmail });
+      printJSON({ removed: true, team_id: flags.teamId, member_email: flags.memberEmail });
     });
 }

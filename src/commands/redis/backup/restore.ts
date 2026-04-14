@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../../auth.js";
 import { request } from "../../../client.js";
-import { printJSON, handleError } from "../../../output.js";
+import { printJSON } from "../../../output.js";
 
 export function registerBackupRestore(backup: Command): void {
   backup
@@ -13,11 +13,7 @@ export function registerBackupRestore(backup: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { dbId: string; backupId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const result = await request(auth, "POST", `/v2/redis/restore-backup/${flags.dbId}`, { backup_id: flags.backupId });
-        printJSON(result);
-      } catch (err) {
-        handleError(err);
-      }
+      const result = await request(auth, "POST", `/v2/redis/restore-backup/${flags.dbId}`, { backup_id: flags.backupId });
+      printJSON(result);
     });
 }

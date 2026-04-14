@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import type { QStashUser } from "../../types.js";
 
 export function registerQStashRotateToken(qstash: Command): void {
@@ -13,11 +13,7 @@ export function registerQStashRotateToken(qstash: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { qstashId: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const q = await request<QStashUser>(auth, "POST", `/v2/qstash/rotate-token/${flags.qstashId}`);
-        printJSON(q);
-      } catch (err) {
-        handleError(err);
-      }
+      const q = await request<QStashUser>(auth, "POST", `/v2/qstash/rotate-token/${flags.qstashId}`);
+      printJSON(q);
     });
 }

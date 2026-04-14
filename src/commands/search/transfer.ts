@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerSearchTransfer(search: Command): void {
   search
@@ -13,11 +13,7 @@ export function registerSearchTransfer(search: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { indexId: string; email?: string; apiKey?: string; targetAccount: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const result = await request(auth, "POST", `/v2/search/${flags.indexId}/transfer`, { target_account: flags.targetAccount });
-        printJSON(result);
-      } catch (err) {
-        handleError(err);
-      }
+      const result = await request(auth, "POST", `/v2/search/${flags.indexId}/transfer`, { target_account: flags.targetAccount });
+      printJSON(result);
     });
 }

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerQStashMoveToTeam(qstash: Command): void {
   qstash
@@ -13,11 +13,7 @@ export function registerQStashMoveToTeam(qstash: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string; qstashId: string; targetTeamId: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const result = await request(auth, "POST", "/v2/qstash/move-to-team", { qstash_id: flags.qstashId, target_team_id: flags.targetTeamId });
-        printJSON(result);
-      } catch (err) {
-        handleError(err);
-      }
+      const result = await request(auth, "POST", "/v2/qstash/move-to-team", { qstash_id: flags.qstashId, target_team_id: flags.targetTeamId });
+      printJSON(result);
     });
 }

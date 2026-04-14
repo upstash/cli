@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import type { QStashUser } from "../../types.js";
 
 export function registerQStashList(qstash: Command): void {
@@ -12,11 +12,7 @@ export function registerQStashList(qstash: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const users = await request<QStashUser[]>(auth, "GET", "/v2/qstash/users");
-        printJSON(users);
-      } catch (err) {
-        handleError(err);
-      }
+      const users = await request<QStashUser[]>(auth, "GET", "/v2/qstash/users");
+      printJSON(users);
     });
 }

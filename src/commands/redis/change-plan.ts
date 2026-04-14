@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerChangePlan(redis: Command): void {
   redis
@@ -13,11 +13,7 @@ export function registerChangePlan(redis: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { dbId: string; plan: string; email?: string; apiKey?: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const result = await request(auth, "POST", `/v2/redis/change-plan/${flags.dbId}`, { plan: flags.plan });
-        printJSON(result);
-      } catch (err) {
-        handleError(err);
-      }
+      const result = await request(auth, "POST", `/v2/redis/change-plan/${flags.dbId}`, { plan: flags.plan });
+      printJSON(result);
     });
 }

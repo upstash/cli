@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import { SEARCH_REGIONS, SEARCH_PLANS } from "../../types.js";
 import type { SearchIndex } from "../../types.js";
 
@@ -16,11 +16,7 @@ export function registerSearchCreate(search: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { email?: string; apiKey?: string; name: string; region: string; type: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const idx = await request<SearchIndex>(auth, "POST", "/v2/search", { name: flags.name, region: flags.region, type: flags.type });
-        printJSON(idx);
-      } catch (err) {
-        handleError(err);
-      }
+      const idx = await request<SearchIndex>(auth, "POST", "/v2/search", { name: flags.name, region: flags.region, type: flags.type });
+      printJSON(idx);
     });
 }

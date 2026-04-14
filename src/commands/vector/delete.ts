@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 export function registerVectorDelete(vector: Command): void {
   vector
@@ -17,11 +17,7 @@ export function registerVectorDelete(vector: Command): void {
         return;
       }
       const auth = resolveAuth(flags);
-      try {
-        await request(auth, "DELETE", `/v2/vector/index/${flags.indexId}`);
-        printJSON({ deleted: true, index_id: flags.indexId });
-      } catch (err) {
-        handleError(err);
-      }
+      await request(auth, "DELETE", `/v2/vector/index/${flags.indexId}`);
+      printJSON({ deleted: true, index_id: flags.indexId });
     });
 }

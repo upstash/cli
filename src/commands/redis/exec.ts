@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 
 interface Flags {
   dbUrl: string;
@@ -17,31 +17,26 @@ export function registerExec(redis: Command): void {
     .action(async (flags: Flags) => {
       const args = parseCommand(flags.command);
       if (args.length === 0) {
-        handleError(new Error("Empty command"));
+        throw new Error("Empty command");
       }
 
-      try {
-        const url = flags.dbUrl.replace(/\/$/, "");
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${flags.dbToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(args),
-        });
+      const url = flags.dbUrl.replace(/\/$/, "");
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${flags.dbToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(args),
+      });
 
-        const data = await response.json() as { result?: unknown; error?: string };
+      const data = await response.json() as { result?: unknown; error?: string };
 
-        if (data.error) {
-          console.error(JSON.stringify({ error: data.error }));
-          process.exit(1);
-        }
-
-        printJSON({ result: data.result });
-      } catch (err) {
-        handleError(err);
+      if (data.error) {
+        throw new Error(data.error);
       }
+
+      printJSON({ result: data.result });
     });
 }
 

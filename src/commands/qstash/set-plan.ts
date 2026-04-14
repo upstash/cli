@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { request } from "../../client.js";
-import { printJSON, handleError } from "../../output.js";
+import { printJSON } from "../../output.js";
 import { QSTASH_PLANS } from "../../types.js";
 
 export function registerQStashSetPlan(qstash: Command): void {
@@ -14,11 +14,7 @@ export function registerQStashSetPlan(qstash: Command): void {
     .option("--api-key <key>", "Upstash API key")
     .action(async (flags: { qstashId: string; email?: string; apiKey?: string; plan: string }) => {
       const auth = resolveAuth(flags);
-      try {
-        const result = await request(auth, "POST", `/v2/qstash/set-plan/${flags.qstashId}`, { plan_name: flags.plan });
-        printJSON(result);
-      } catch (err) {
-        handleError(err);
-      }
+      const result = await request(auth, "POST", `/v2/qstash/set-plan/${flags.qstashId}`, { plan_name: flags.plan });
+      printJSON(result);
     });
 }

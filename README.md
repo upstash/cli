@@ -19,14 +19,28 @@ Prebuilt binaries (Windows, Linux, macOS Intel and Apple Silicon) are on [GitHub
 
 ## Authentication
 
-Set both variables before running commands:
+Pick any one of these three methods:
 
+**Environment variables**
 ```bash
 export UPSTASH_EMAIL=you@example.com
 export UPSTASH_API_KEY=your_api_key
 ```
 
-Most commands also accept `--email` and `--api-key`, which override the environment for that invocation.
+**`.env` file** — place a `.env` in your working directory and the CLI loads it automatically:
+```bash
+UPSTASH_EMAIL=you@example.com
+UPSTASH_API_KEY=your_api_key
+```
+
+**Per-command flags** — `--email` and `--api-key` override everything else for that invocation.
+
+**Custom `.env` path** — use `--env-file <path>` to load a file from a specific location:
+```bash
+upstash --env-file ~/secrets/.env redis list
+```
+
+Precedence: flags > environment variables > `.env` file.
 
 For agents, a **read-only** Developer API key is often enough: the API only returns what that key allows, and only those operations succeed—mutations fail at the API like in the console.
 
@@ -74,7 +88,7 @@ upstash redis exec --db-url <url> --db-token <token> --command "SET key value"
 upstash redis exec --db-url <url> --db-token <token> --command "GET key"
 ```
 
-Use `endpoint` / `https://...` and `rest_token` from `upstash redis get --db-id <id>`.
+`--db-url` and `--db-token` can be omitted if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set (env vars or `.env` file). Use `endpoint` and `rest_token` from `upstash redis get --db-id <id>`.
 
 ### Core
 

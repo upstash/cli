@@ -15,11 +15,25 @@ From a clone: `npm install`, `npm run build`, then `node dist/cli.js …` or `np
 
 ## Authentication
 
-Set environment variables before running any command:
+Three ways to supply credentials (precedence: flags > env vars > `.env` file):
 
+**Environment variables:**
 ```bash
 export UPSTASH_EMAIL=you@example.com
 export UPSTASH_API_KEY=your_api_key
+```
+
+**`.env` file** — place a `.env` in the working directory and the CLI loads it automatically:
+```bash
+UPSTASH_EMAIL=you@example.com
+UPSTASH_API_KEY=your_api_key
+```
+
+**Per-command flags:** `--email <email>` and `--api-key <key>` override everything else for that invocation.
+
+**Custom `.env` path:** pass `--env-file <path>` as a global flag to load credentials from a specific file:
+```bash
+upstash --env-file ~/secrets/.env redis list
 ```
 
 **Agents:** You can use a **read-only** Developer API key in `UPSTASH_API_KEY`. The Developer API then only returns what that key is allowed to see, and only the actions allowed for that key will succeed; anything else fails at the API.
@@ -78,7 +92,7 @@ upstash redis exec --db-url <url> --db-token <token> --command "GET key"
 upstash redis exec --db-url <url> --db-token <token> --command "HGETALL myhash"
 ```
 
-The `--db-url` and `--db-token` come from a prior `upstash redis get --db-id <id>` call (`endpoint` and `rest_token` fields). Returns `{ "result": ... }` on success or `{ "error": "..." }` on failure.
+`--db-url` and `--db-token` can be omitted if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set (env vars or `.env` file). The values come from a prior `upstash redis get --db-id <id>` call (`endpoint` and `rest_token` fields). Returns `{ "result": ... }` on success or `{ "error": "..." }` on failure.
 
 ### Core CRUD
 

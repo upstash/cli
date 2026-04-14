@@ -8,13 +8,25 @@ import { registerVector } from "./commands/vector/index.js";
 import { registerSearch } from "./commands/search/index.js";
 import { registerQStash } from "./commands/qstash/index.js";
 import { handleError } from "./output.js";
+import dotenv from "dotenv";
+
+// Pre-scan argv for --env-file before Commander parses, so dotenv loads
+// the right file before any command action reads process.env.
+const envFileIndex = process.argv.indexOf("--env-file");
+const envFilePath = envFileIndex !== -1 ? process.argv[envFileIndex + 1] : undefined;
+const dotenvResult = dotenv.config(envFilePath ? { path: envFilePath } : undefined);
+if (envFilePath && dotenvResult.error) {
+  console.error(JSON.stringify({ error: `Could not load env file: ${envFilePath}` }));
+  process.exit(1);
+}
 
 const program = new Command();
 
 program
   .name("upstash")
   .description("Agent-friendly CLI for Upstash")
-  .version(version);
+  .version(version)
+  .option("--env-file <path>", "Path to a .env file to load credentials from");
 
 registerRedis(program);
 registerTeam(program);

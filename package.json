@@ -18,11 +18,15 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.test.json --noEmit"
   },
-  "keywords": ["upstash", "cli"],
+  "keywords": [
+    "upstash",
+    "cli"
+  ],
   "author": "Upstash",
   "license": "MIT",
   "dependencies": {
-    "commander": "^13.0.0"
+    "commander": "^13.0.0",
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -35,5 +39,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ]
 }

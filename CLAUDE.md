@@ -87,9 +87,10 @@ All commands output JSON to stdout. Errors output `{ "error": "..." }` to stderr
 ### Execute Commands
 
 ```bash
-upstash redis exec --db-url <url> --db-token <token> --command "SET key value"
-upstash redis exec --db-url <url> --db-token <token> --command "GET key"
-upstash redis exec --db-url <url> --db-token <token> --command "HGETALL myhash"
+upstash redis exec --db-url <url> --db-token <token> SET key value
+upstash redis exec --db-url <url> --db-token <token> GET key
+upstash redis exec --db-url <url> --db-token <token> HGETALL myhash
+upstash redis exec --db-url <url> --db-token <token> --json '["SET","key","value"]'
 ```
 
 `--db-url` and `--db-token` can be omitted if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set (env vars or `.env` file). The values come from a prior `upstash redis get --db-id <id>` call (`endpoint` and `rest_token` fields). Returns `{ "result": ... }` on success or `{ "error": "..." }` on failure.

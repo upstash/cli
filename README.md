@@ -84,8 +84,9 @@ upstash redis --help
 ### Execute via REST (`redis exec` does not use the Developer API key)
 
 ```bash
-upstash redis exec --db-url <url> --db-token <token> --command "SET key value"
-upstash redis exec --db-url <url> --db-token <token> --command "GET key"
+upstash redis exec --db-url <url> --db-token <token> SET key value
+upstash redis exec --db-url <url> --db-token <token> GET key
+upstash redis exec --db-url <url> --db-token <token> --json '["SET","key","value"]'
 ```
 
 `--db-url` and `--db-token` can be omitted if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set (env vars or `.env` file). Use `endpoint` and `rest_token` from `upstash redis get --db-id <id>`.

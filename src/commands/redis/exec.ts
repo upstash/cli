@@ -4,17 +4,21 @@ import { printJSON } from "../../output.js";
 interface Flags {
   dbUrl?: string;
   dbToken?: string;
-  command: string;
+  json?: string;
 }
 
 export function registerExec(redis: Command): void {
   redis
     .command("exec")
-    .description("Execute a Redis command against a database via the REST API")
+    .description(
+      "Execute a Redis command against a database via the REST API. " +
+      "Pass args as positional tokens (shell handles quoting) or via --json."
+    )
     .option("--db-url <url>", "Database REST URL (overrides UPSTASH_REDIS_REST_URL)")
     .option("--db-token <token>", "Database REST token (overrides UPSTASH_REDIS_REST_TOKEN)")
-    .requiredOption("--command <command>", 'Redis command to run (e.g. "SET key value")')
-    .action(async (flags: Flags) => {
+    .option("--json <json>", 'Redis command args as a JSON array (e.g. \'["SET","key","val"]\')')
+    .argument("[args...]", "Command tokens (e.g. SET key value)")
+    .action(async (positional: string[], flags: Flags) => {
       const dbUrl = flags.dbUrl ?? process.env.UPSTASH_REDIS_REST_URL;
       const dbToken = flags.dbToken ?? process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -24,9 +28,13 @@ export function registerExec(redis: Command): void {
         );
       }
 
-      const args = parseCommand(flags.command);
+      if (positional.length > 0 && flags.json) {
+        throw new Error("Provide either positional args or --json, not both.");
+      }
+
+      const args = flags.json ? parseJsonArgs(flags.json) : positional;
       if (args.length === 0) {
-        throw new Error("Empty command");
+        throw new Error("Empty command. Pass positional tokens or --json.");
       }
 
       const url = dbUrl.replace(/\/$/, "");
@@ -49,30 +57,15 @@ export function registerExec(redis: Command): void {
     });
 }
 
-export function parseCommand(input: string): string[] {
-  const args: string[] = [];
-  let current = "";
-  let inSingle = false;
-  let inDouble = false;
-
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
-    if (ch === undefined) break;
-
-    if (ch === "'" && !inDouble) {
-      inSingle = !inSingle;
-    } else if (ch === '"' && !inSingle) {
-      inDouble = !inDouble;
-    } else if (ch === " " && !inSingle && !inDouble) {
-      if (current.length > 0) {
-        args.push(current);
-        current = "";
-      }
-    } else {
-      current += ch;
-    }
+function parseJsonArgs(input: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    throw new Error(`--json must be valid JSON; got: ${input}`);
   }
-
-  if (current.length > 0) args.push(current);
-  return args;
+  if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === "string" || typeof x === "number" || typeof x === "boolean")) {
+    throw new Error("--json must be a JSON array of strings/numbers/booleans.");
+  }
+  return parsed.map((x) => String(x));
 }

@@ -173,7 +173,7 @@ describe("redis exec", () => {
       "redis", "exec",
       "--db-url", dbUrl,
       "--db-token", dbRestToken,
-      "--command", "SET cli-test-key hello",
+      "SET", "cli-test-key", "hello",
     ]) as { result: unknown };
     expect(setResult.result).toBe("OK");
 
@@ -182,7 +182,7 @@ describe("redis exec", () => {
       "redis", "exec",
       "--db-url", dbUrl,
       "--db-token", dbRestToken,
-      "--command", "GET cli-test-key",
+      "GET", "cli-test-key",
     ]) as { result: unknown };
     expect(getResult.result).toBe("hello");
 
@@ -191,7 +191,7 @@ describe("redis exec", () => {
       "redis", "exec",
       "--db-url", dbUrl,
       "--db-token", dbRestToken,
-      "--command", "DEL cli-test-key",
+      "DEL", "cli-test-key",
     ]);
   });
 
@@ -203,7 +203,7 @@ describe("redis exec", () => {
       "redis", "exec",
       "--db-url", `https://${dbEndpoint}`,
       "--db-token", dbRestToken,
-      "--command", "PING",
+      "PING",
     ]) as { result: unknown };
     expect(result.result).toBe("PONG");
   });

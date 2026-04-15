@@ -13,9 +13,6 @@ export function registerCreate(redis: Command): void {
     .requiredOption("--region <region>", `Primary region. Available: ${REGIONS.join(", ")}`)
     .option("--read-regions <regions...>", "Read replica regions (space-separated)")
     .action(async (flags: { name: string; region: string; readRegions?: string[] }, command: Command) => {
-      if (!(REGIONS as readonly string[]).includes(flags.region)) {
-        throw new Error(`Invalid region '${flags.region}'. Available: ${REGIONS.join(", ")}`);
-      }
       const auth = resolveAuth(command);
       const db = await request<Database>(auth, "POST", "/v2/redis/database", {
         database_name: flags.name,

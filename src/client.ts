@@ -21,6 +21,15 @@ export async function request<T>(
   const text = await response.text();
 
   if (!response.ok) {
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+      const msg = parsed.error ?? parsed.message;
+      if (typeof msg === "string" && msg.length > 0) {
+        throw new Error(msg);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message && !(err instanceof SyntaxError)) throw err;
+    }
     throw new Error(text || `HTTP ${response.status}`);
   }
 

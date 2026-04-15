@@ -31,9 +31,9 @@ UPSTASH_API_KEY=your_api_key
 
 **Per-command flags:** `--email <email>` and `--api-key <key>` override everything else for that invocation.
 
-**Custom `.env` path:** pass `--env-file <path>` as a global flag to load credentials from a specific file:
+**Custom `.env` path:** pass `--env-path <path>` as a global flag to load credentials from a specific file:
 ```bash
-upstash --env-file ~/secrets/.env redis list
+upstash --env-path ~/secrets/.env redis list
 ```
 
 **Agents:** Prefer a **read-only** Developer API key in `UPSTASH_API_KEY` when you can. The API only returns what that key may access, and only actions permitted for read-only keys succeed; the rest fail at the API.

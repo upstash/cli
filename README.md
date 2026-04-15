@@ -35,9 +35,9 @@ UPSTASH_API_KEY=your_api_key
 
 **Per-command flags** — `--email` and `--api-key` override everything else for that invocation.
 
-**Custom `.env` path** — use `--env-file <path>` to load a file from a specific location:
+**Custom `.env` path** — use `--env-path <path>` to load a file from a specific location:
 ```bash
-upstash --env-file ~/secrets/.env redis list
+upstash --env-path ~/secrets/.env redis list
 ```
 
 Precedence: flags > environment variables > `.env` file.

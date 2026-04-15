@@ -26,7 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "commander": "^13.0.0",
-    "dotenv": "^17.4.2"
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

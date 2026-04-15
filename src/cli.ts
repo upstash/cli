@@ -12,8 +12,13 @@ import dotenv from "dotenv";
 
 // Pre-scan argv for --env-file before Commander parses, so dotenv loads
 // the right file before any command action reads process.env.
-const envFileIndex = process.argv.indexOf("--env-file");
-const envFilePath = envFileIndex !== -1 ? process.argv[envFileIndex + 1] : undefined;
+function findEnvFile(argv: string[]): string | undefined {
+  const eq = argv.find((a) => a.startsWith("--env-file="));
+  if (eq) return eq.slice("--env-file=".length);
+  const i = argv.indexOf("--env-file");
+  return i !== -1 ? argv[i + 1] : undefined;
+}
+const envFilePath = findEnvFile(process.argv);
 const dotenvResult = dotenv.config(envFilePath ? { path: envFilePath } : undefined);
 if (envFilePath && dotenvResult.error) {
   console.error(JSON.stringify({ error: `Could not load env file: ${envFilePath}` }));

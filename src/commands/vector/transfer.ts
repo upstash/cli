@@ -9,10 +9,8 @@ export function registerVectorTransfer(vector: Command): void {
     .description("Transfer a vector index to another team")
     .requiredOption("--index-id <id>", "Vector index ID")
     .requiredOption("--target-account <id>", "Target team ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { indexId: string; email?: string; apiKey?: string; targetAccount: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { indexId: string; targetAccount: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/vector/index/${flags.indexId}/transfer`, { target_account: flags.targetAccount });
       printJSON(result);
     });

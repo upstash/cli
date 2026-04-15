@@ -17,13 +17,11 @@ export function registerVectorCreate(vector: Command): void {
     .option("--embedding-model <model>", `Embedding model. Available: ${VECTOR_EMBEDDING_MODELS.join(", ")}`)
     .option("--index-type <type>", `Index type. Available: ${VECTOR_INDEX_TYPES.join(", ")}`)
     .option("--sparse-embedding-model <model>", `Sparse embedding model. Available: ${VECTOR_SPARSE_MODELS.join(", ")}`)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string; name: string; region: string; similarityFunction: string; dimensionCount: number; type?: string; embeddingModel?: string; indexType?: string; sparseEmbeddingModel?: string }) => {
+    .action(async (flags: { name: string; region: string; similarityFunction: string; dimensionCount: number; type?: string; embeddingModel?: string; indexType?: string; sparseEmbeddingModel?: string }, command: Command) => {
       if (!Number.isFinite(flags.dimensionCount) || !Number.isInteger(flags.dimensionCount) || flags.dimensionCount < 0) {
       throw new Error(`Invalid --dimension-count: "${flags.dimensionCount}". Must be a non-negative integer.`);
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       const idx = await request<VectorIndex>(auth, "POST", "/v2/vector/index", {
         name: flags.name,
         region: flags.region,

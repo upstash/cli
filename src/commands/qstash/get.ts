@@ -9,10 +9,8 @@ export function registerQStashGet(qstash: Command): void {
     .command("get")
     .description("Get details of a QStash instance")
     .requiredOption("--qstash-id <id>", "QStash instance ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { qstashId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { qstashId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const q = await request<QStashUser>(auth, "GET", `/v2/qstash/user/${flags.qstashId}`);
       printJSON(q);
     });

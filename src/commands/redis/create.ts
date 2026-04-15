@@ -12,13 +12,11 @@ export function registerCreate(redis: Command): void {
     .requiredOption("--name <name>", "Database name")
     .requiredOption("--region <region>", `Primary region. Available: ${REGIONS.join(", ")}`)
     .option("--read-regions <regions...>", "Read replica regions (space-separated)")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string; name: string; region: string; readRegions?: string[] }) => {
+    .action(async (flags: { name: string; region: string; readRegions?: string[] }, command: Command) => {
       if (!(REGIONS as readonly string[]).includes(flags.region)) {
         throw new Error(`Invalid region '${flags.region}'. Available: ${REGIONS.join(", ")}`);
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       const db = await request<Database>(auth, "POST", "/v2/redis/database", {
         database_name: flags.name,
         region: "global",

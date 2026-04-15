@@ -9,10 +9,8 @@ export function registerTeamMembers(team: Command): void {
     .command("members")
     .description("List all members of a team")
     .requiredOption("--team-id <id>", "Team ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { teamId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { teamId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const members = await request<TeamMember[]>(auth, "GET", `/v2/teams/${flags.teamId}`);
       printJSON(members);
     });

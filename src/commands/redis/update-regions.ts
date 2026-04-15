@@ -10,10 +10,8 @@ export function registerUpdateRegions(redis: Command): void {
     .description("Update read replica regions for a Redis database")
     .requiredOption("--db-id <id>", "Database ID")
     .requiredOption("--read-regions <regions...>", `Read replica regions. Available: ${REGIONS.join(", ")}`)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { dbId: string; readRegions: string[]; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { dbId: string; readRegions: string[] }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/redis/update-regions/${flags.dbId}`, { read_regions: flags.readRegions });
       printJSON(result);
     });

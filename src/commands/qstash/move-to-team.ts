@@ -9,10 +9,8 @@ export function registerQStashMoveToTeam(qstash: Command): void {
     .description("Move a QStash instance to a team")
     .requiredOption("--qstash-id <id>", "QStash instance ID")
     .requiredOption("--target-team-id <id>", "Target team ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string; qstashId: string; targetTeamId: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { qstashId: string; targetTeamId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", "/v2/qstash/move-to-team", { qstash_id: flags.qstashId, target_team_id: flags.targetTeamId });
       printJSON(result);
     });

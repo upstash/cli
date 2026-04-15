@@ -26,7 +26,9 @@ program
   .name("upstash")
   .description("Agent-friendly CLI for Upstash")
   .version(version)
-  .option("--env-file <path>", "Path to a .env file to load credentials from");
+  .option("--env-file <path>", "Path to a .env file to load credentials from")
+  .option("--email <email>", "Upstash email (overrides UPSTASH_EMAIL)")
+  .option("--api-key <key>", "Upstash API key (overrides UPSTASH_API_KEY)");
 
 registerRedis(program);
 registerTeam(program);

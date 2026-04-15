@@ -10,10 +10,8 @@ export function registerTeamCreate(team: Command): void {
     .description("Create a new team")
     .requiredOption("--name <name>", "Team name")
     .option("--copy-cc", "Copy existing credit card information to the team")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string; name: string; copyCc?: boolean }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { name: string; copyCc?: boolean }, command: Command) => {
+      const auth = resolveAuth(command);
       const t = await request<Team>(auth, "POST", "/v2/team", { team_name: flags.name, copy_cc: flags.copyCc ?? false });
       printJSON(t);
     });

@@ -10,10 +10,8 @@ export function registerQStashStats(qstash: Command): void {
     .description("Get usage statistics for a QStash instance")
     .requiredOption("--qstash-id <id>", "QStash instance ID")
     .option("--period <period>", `Time period. Available: ${STATS_PERIODS.join(", ")}`, "1h")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { qstashId: string; email?: string; apiKey?: string; period?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { qstashId: string; period?: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const qs = flags.period ? `?period=${encodeURIComponent(flags.period)}` : "";
       const stats = await request<Record<string, unknown>>(auth, "GET", `/v2/qstash/stats/${flags.qstashId}${qs}`);
       printJSON(stats);

@@ -9,14 +9,12 @@ export function registerDelete(redis: Command): void {
     .description("Delete a Redis database")
     .requiredOption("--db-id <id>", "Database ID")
     .option("--dry-run", "Preview the action without executing it")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { dbId: string; dryRun?: boolean; email?: string; apiKey?: string }) => {
+    .action(async (flags: { dbId: string; dryRun?: boolean }, command: Command) => {
       if (flags.dryRun) {
         printJSON({ action: "delete", database_id: flags.dbId, dry_run: true });
         return;
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       await request(auth, "DELETE", `/v2/redis/database/${flags.dbId}`);
       printJSON({ deleted: true, database_id: flags.dbId });
     });

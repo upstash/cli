@@ -9,10 +9,8 @@ export function registerBackupList(backup: Command): void {
     .command("list")
     .description("List all backups for a Redis database")
     .requiredOption("--db-id <id>", "Database ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { dbId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { dbId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const backups = await request<Backup[]>(auth, "GET", `/v2/redis/list-backup/${flags.dbId}`);
       printJSON(backups);
     });

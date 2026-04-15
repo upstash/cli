@@ -9,10 +9,8 @@ export function registerSearchTransfer(search: Command): void {
     .description("Transfer a search index to another team")
     .requiredOption("--index-id <id>", "Search index ID")
     .requiredOption("--target-account <id>", "Target team ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { indexId: string; email?: string; apiKey?: string; targetAccount: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { indexId: string; targetAccount: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/search/${flags.indexId}/transfer`, { target_account: flags.targetAccount });
       printJSON(result);
     });

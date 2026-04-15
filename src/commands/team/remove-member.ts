@@ -9,15 +9,13 @@ export function registerTeamRemoveMember(team: Command): void {
     .description("Remove a member from a team")
     .requiredOption("--team-id <id>", "Team ID")
     .requiredOption("--member-email <email>", "Email of the member to remove")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
     .option("--dry-run", "Preview the action without executing it")
-    .action(async (flags: { email?: string; apiKey?: string; dryRun?: boolean; teamId: string; memberEmail: string }) => {
+    .action(async (flags: { dryRun?: boolean; teamId: string; memberEmail: string }, command: Command) => {
       if (flags.dryRun) {
         printJSON({ action: "remove-member", team_id: flags.teamId, member_email: flags.memberEmail, dry_run: true });
         return;
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       await request(auth, "DELETE", "/v2/teams/member", { team_id: flags.teamId, member_email: flags.memberEmail });
       printJSON({ removed: true, team_id: flags.teamId, member_email: flags.memberEmail });
     });

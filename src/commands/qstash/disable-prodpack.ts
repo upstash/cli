@@ -8,10 +8,8 @@ export function registerQStashDisableProdpack(qstash: Command): void {
     .command("disable-prodpack")
     .description("Disable the production pack for a QStash instance")
     .requiredOption("--qstash-id <id>", "QStash instance ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { qstashId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { qstashId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/qstash/disable-prodpack/${flags.qstashId}`);
       printJSON(result);
     });

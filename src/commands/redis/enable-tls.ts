@@ -8,10 +8,8 @@ export function registerEnableTls(redis: Command): void {
     .command("enable-tls")
     .description("Enable TLS for a Redis database")
     .requiredOption("--db-id <id>", "Database ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { dbId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { dbId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/redis/enable-tls/${flags.dbId}`);
       printJSON(result);
     });

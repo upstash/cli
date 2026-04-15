@@ -8,10 +8,8 @@ export function registerVectorList(vector: Command): void {
   vector
     .command("list")
     .description("List all vector indexes")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: Record<string, never>, command: Command) => {
+      const auth = resolveAuth(command);
       const indexes = await request<VectorIndex[]>(auth, "GET", "/v2/vector/index");
       printJSON(indexes);
     });

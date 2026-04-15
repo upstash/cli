@@ -8,10 +8,8 @@ export function registerList(redis: Command): void {
   redis
     .command("list")
     .description("List all Redis databases")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: Record<string, never>, command: Command) => {
+      const auth = resolveAuth(command);
       const dbs = await request<Database[]>(auth, "GET", "/v2/redis/databases");
       printJSON(dbs);
     });

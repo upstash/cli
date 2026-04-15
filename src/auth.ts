@@ -3,9 +3,14 @@ export interface Auth {
   apiKey: string;
 }
 
-export function resolveAuth(flags: { email?: string; apiKey?: string }): Auth {
-  const email = flags.email ?? process.env.UPSTASH_EMAIL;
-  const apiKey = flags.apiKey ?? process.env.UPSTASH_API_KEY;
+import type { Command } from "commander";
+
+export function resolveAuth(cmdOrFlags: Command | { email?: string; apiKey?: string }): Auth {
+  const opts = typeof (cmdOrFlags as Command).optsWithGlobals === "function"
+    ? (cmdOrFlags as Command).optsWithGlobals()
+    : cmdOrFlags;
+  const email = (opts as { email?: string }).email ?? process.env.UPSTASH_EMAIL;
+  const apiKey = (opts as { apiKey?: string }).apiKey ?? process.env.UPSTASH_API_KEY;
 
   if (!email || !apiKey) {
     throw new Error(

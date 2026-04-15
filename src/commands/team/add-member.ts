@@ -12,13 +12,11 @@ export function registerTeamAddMember(team: Command): void {
     .requiredOption("--team-id <id>", "Team ID")
     .requiredOption("--member-email <email>", "Email of the member to add")
     .requiredOption("--role <role>", `Member role (${TEAM_MEMBER_ROLES.join(", ")})`)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string; teamId: string; memberEmail: string; role: string }) => {
+    .action(async (flags: { teamId: string; memberEmail: string; role: string }, command: Command) => {
       if (!(TEAM_MEMBER_ROLES as readonly string[]).includes(flags.role)) {
       throw new Error(`Invalid role '${flags.role}'. Valid roles: ${TEAM_MEMBER_ROLES.join(", ")}`);
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       const member = await request<TeamMember>(auth, "POST", "/v2/teams/member", {
         team_id: flags.teamId,
         member_email: flags.memberEmail,

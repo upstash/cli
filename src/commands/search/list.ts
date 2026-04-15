@@ -8,10 +8,8 @@ export function registerSearchList(search: Command): void {
   search
     .command("list")
     .description("List all search indexes")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: Record<string, never>, command: Command) => {
+      const auth = resolveAuth(command);
       const indexes = await request<SearchIndex[]>(auth, "GET", "/v2/search");
       printJSON(indexes);
     });

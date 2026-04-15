@@ -10,10 +10,8 @@ export function registerVectorSetPlan(vector: Command): void {
     .description(`Change the plan of a vector index. Plans: ${VECTOR_PLANS.join(", ")}`)
     .requiredOption("--index-id <id>", "Vector index ID")
     .requiredOption("--plan <plan>", `Target plan (${VECTOR_PLANS.join(", ")})`)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { indexId: string; email?: string; apiKey?: string; plan: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { indexId: string; plan: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/vector/index/${flags.indexId}/setplan`, { target_plan: flags.plan });
       printJSON(result);
     });

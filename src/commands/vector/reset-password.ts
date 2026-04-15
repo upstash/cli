@@ -9,10 +9,8 @@ export function registerVectorResetPassword(vector: Command): void {
     .command("reset-password")
     .description("Reset tokens for a vector index")
     .requiredOption("--index-id <id>", "Vector index ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { indexId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { indexId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const idx = await request<VectorIndex>(auth, "POST", `/v2/vector/index/${flags.indexId}/reset-password`);
       printJSON(idx);
     });

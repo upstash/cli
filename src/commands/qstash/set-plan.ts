@@ -10,10 +10,8 @@ export function registerQStashSetPlan(qstash: Command): void {
     .description(`Change the plan for a QStash instance. Plans: ${QSTASH_PLANS.join(", ")}`)
     .requiredOption("--qstash-id <id>", "QStash instance ID")
     .requiredOption("--plan <plan>", `Target plan (${QSTASH_PLANS.join(", ")})`)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { qstashId: string; email?: string; apiKey?: string; plan: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { qstashId: string; plan: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const result = await request(auth, "POST", `/v2/qstash/set-plan/${flags.qstashId}`, { plan_name: flags.plan });
       printJSON(result);
     });

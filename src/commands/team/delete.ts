@@ -8,15 +8,13 @@ export function registerTeamDelete(team: Command): void {
     .command("delete")
     .description("Delete a team")
     .requiredOption("--team-id <id>", "Team ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
     .option("--dry-run", "Preview the action without executing it")
-    .action(async (flags: { teamId: string; email?: string; apiKey?: string; dryRun?: boolean }) => {
+    .action(async (flags: { teamId: string; dryRun?: boolean }, command: Command) => {
       if (flags.dryRun) {
         printJSON({ action: "delete", team_id: flags.teamId, dry_run: true });
         return;
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       await request(auth, "DELETE", `/v2/team/${flags.teamId}`);
       printJSON({ deleted: true, team_id: flags.teamId });
     });

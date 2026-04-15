@@ -12,10 +12,8 @@ export function registerSearchCreate(search: Command): void {
     .requiredOption("--name <name>", "Index name")
     .requiredOption("--region <region>", `Region. Available: ${SEARCH_REGIONS.join(", ")}`)
     .requiredOption("--type <type>", `Plan type. Available: ${SEARCH_PLANS.join(", ")}`)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string; name: string; region: string; type: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { name: string; region: string; type: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const idx = await request<SearchIndex>(auth, "POST", "/v2/search", { name: flags.name, region: flags.region, type: flags.type });
       printJSON(idx);
     });

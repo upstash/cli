@@ -10,10 +10,8 @@ export function registerVectorRename(vector: Command): void {
     .description("Rename a vector index")
     .requiredOption("--index-id <id>", "Vector index ID")
     .requiredOption("--name <name>", "New index name")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { indexId: string; email?: string; apiKey?: string; name: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { indexId: string; name: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const idx = await request<VectorIndex>(auth, "POST", `/v2/vector/index/${flags.indexId}/rename`, { name: flags.name });
       printJSON(idx);
     });

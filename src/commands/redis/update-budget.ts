@@ -9,13 +9,11 @@ export function registerUpdateBudget(redis: Command): void {
     .description("Update the monthly spend budget for a Redis database (in cents)")
     .requiredOption("--db-id <id>", "Database ID")
     .requiredOption("--budget <amount>", "Monthly budget in cents", parseInt)
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { dbId: string; budget: number; email?: string; apiKey?: string }) => {
+    .action(async (flags: { dbId: string; budget: number }, command: Command) => {
       if (!Number.isFinite(flags.budget) || !Number.isInteger(flags.budget) || flags.budget < 0) {
         throw new Error(`Invalid --budget: "${flags.budget}". Must be a non-negative integer (cents).`);
       }
-      const auth = resolveAuth(flags);
+      const auth = resolveAuth(command);
       const result = await request(auth, "PATCH", `/v2/redis/update-budget/${flags.dbId}`, { budget: flags.budget });
       printJSON(result);
     });

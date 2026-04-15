@@ -9,10 +9,8 @@ export function registerVectorGet(vector: Command): void {
     .command("get")
     .description("Get details of a vector index")
     .requiredOption("--index-id <id>", "Vector index ID")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { indexId: string; email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: { indexId: string }, command: Command) => {
+      const auth = resolveAuth(command);
       const idx = await request<VectorIndex>(auth, "GET", `/v2/vector/index/${flags.indexId}`);
       printJSON(idx);
     });

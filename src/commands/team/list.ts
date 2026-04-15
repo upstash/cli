@@ -8,10 +8,8 @@ export function registerTeamList(team: Command): void {
   team
     .command("list")
     .description("List all teams")
-    .option("--email <email>", "Upstash email")
-    .option("--api-key <key>", "Upstash API key")
-    .action(async (flags: { email?: string; apiKey?: string }) => {
-      const auth = resolveAuth(flags);
+    .action(async (flags: Record<string, never>, command: Command) => {
+      const auth = resolveAuth(command);
       const teams = await request<Team[]>(auth, "GET", "/v2/teams");
       printJSON(teams);
     });

@@ -11,9 +11,7 @@ Agent-friendly CLI for managing & debugging Upstash resources from your terminal
 npm i -g @upstash/cli
 ```
 
-Prebuilt binaries for Windows, Linux, and macOS (Intel + Apple Silicon) are also on [GitHub Releases](https://github.com/upstash/cli/releases/latest).
-
-For agents, pair the CLI with the [Upstash Skill](https://docs.upstash.com/agent-resources/skills); it bundles Upstash docs alongside the `upstash` CLI.
+For agents, pair the CLI with the [Upstash Skill](https://docs.upstash.com/agent-resources/skills), it bundles Upstash docs alongside docs for the `upstash` CLI.
 
 ```bash
 npx skills add upstash/skills

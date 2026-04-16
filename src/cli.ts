@@ -7,6 +7,8 @@ import { registerTeam } from "./commands/team/index.js";
 import { registerVector } from "./commands/vector/index.js";
 import { registerSearch } from "./commands/search/index.js";
 import { registerQStash } from "./commands/qstash/index.js";
+import { registerLogin } from "./commands/login.js";
+import { registerLogout } from "./commands/logout.js";
 import { handleError } from "./output.js";
 import dotenv from "dotenv";
 
@@ -35,6 +37,8 @@ program
   .option("--email <email>", "Upstash email (overrides UPSTASH_EMAIL)")
   .option("--api-key <key>", "Upstash API key (overrides UPSTASH_API_KEY)");
 
+registerLogin(program);
+registerLogout(program);
 registerRedis(program);
 registerTeam(program);
 registerVector(program);

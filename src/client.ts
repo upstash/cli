@@ -2,6 +2,14 @@ import type { Auth } from "./auth.js";
 
 const BASE_URL = "https://api.upstash.com";
 
+export class HttpError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function request<T>(
   auth: Auth,
   method: string,
@@ -21,16 +29,15 @@ export async function request<T>(
   const text = await response.text();
 
   if (!response.ok) {
+    let message = text || `HTTP ${response.status}`;
     try {
       const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
       const msg = parsed.error ?? parsed.message;
-      if (typeof msg === "string" && msg.length > 0) {
-        throw new Error(msg);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message && !(err instanceof SyntaxError)) throw err;
+      if (typeof msg === "string" && msg.length > 0) message = msg;
+    } catch {
+      // fall through with the raw text
     }
-    throw new Error(text || `HTTP ${response.status}`);
+    throw new HttpError(message, response.status);
   }
 
   if (text === "" || text === '"OK"') return "OK" as T;

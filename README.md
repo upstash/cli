@@ -1,6 +1,6 @@
 # Upstash CLI
 
-Manage Upstash services from the terminal or automation via the [Upstash Developer API](https://docs.upstash.com/redis/howto/developerapi). Commands are non-interactive; successful output on stdout is always JSON (parse with `jq` or similar). Errors go to stderr as `{ "error": "..." }` with exit code 1.
+Manage Upstash services from the terminal or automation via the [Upstash Developer API](https://docs.upstash.com/redis/howto/developerapi). Commands are non-interactive; API-returning commands print JSON on stdout (parse with `jq` or similar). Errors go to stderr as `{ "error": "..." }` with exit code 1. The auth helpers `login` / `logout` print a plain status line.
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/upstash/cli)
 [![Downloads/week](https://img.shields.io/npm/dw/lstr.svg)](https://npmjs.org/package/@upstash/cli)
@@ -19,7 +19,14 @@ Prebuilt binaries (Windows, Linux, macOS Intel and Apple Silicon) are on [GitHub
 
 ## Authentication
 
-Pick any one of these three methods:
+Pick any one of these methods:
+
+**`upstash login`** — interactive prompt, or non-interactive with flags. Saves credentials to `$XDG_CONFIG_HOME/upstash/config.json` (default `~/.config/upstash/config.json`, mode `0600`):
+```bash
+upstash login                                          # interactive
+upstash login --email you@example.com --api-key <key>  # non-interactive
+upstash logout                                         # removes the saved file
+```
 
 **Environment variables**
 ```bash
@@ -40,7 +47,7 @@ UPSTASH_API_KEY=your_api_key
 upstash --env-path ~/secrets/.env redis list
 ```
 
-Precedence: flags > environment variables > `.env` file.
+Precedence: flags > environment variables > `.env` file > saved config file.
 
 For agents, a **read-only** Developer API key is often enough: the API only returns what that key allows, and only those operations succeed—mutations fail at the API like in the console.
 
@@ -60,6 +67,8 @@ Scoped commands use explicit resource flags with a shared placeholder: `--db-id 
 ## Top-level commands
 
 ```text
+upstash login   # Save credentials to the user config file
+upstash logout  # Delete saved credentials
 upstash redis   # Redis databases
 upstash team    # Teams and members
 upstash vector  # Vector indexes

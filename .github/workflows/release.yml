@@ -23,6 +23,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run build
+
       - name: Publish release candidate
         if: github.event.release.prerelease
         run: npm publish --access public --tag next --provenance

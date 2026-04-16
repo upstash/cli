@@ -1,46 +1,21 @@
-import { cliffy } from "../../deps.ts";
-import { Command } from "../../util/command.ts";
-import { parseAuth } from "../../util/auth.ts";
-import { http } from "../../util/http.ts";
-// import type { Database } from "./types.ts";
-export const deleteCmd = new Command()
-  .name("delete")
-  .description("delete a redis database")
-  .option("--id=<string>", "The uuid of the cluster", { required: true })
-  .example(
-    "Delete",
-    `upstash redis delete --id=f860e7e2-27b8-4166-90d5-ea41e90b4809`,
-  )
-  .action(async (options): Promise<void> => {
-    const authorization = await parseAuth(options);
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON } from "../../output.js";
 
-    // if (!options.id) {
-    //   if (options.ci) {
-    //     throw new cliffy.ValidationError("id");
-    //   }
-    //   const dbs = await http.request<Database[]>({
-    //     method: "GET",
-    //     authorization,
-    //     path: ["v2", "redis", "databases"],
-    //   });
-    //   options.id = await cliffy.Select.prompt({
-    //     message: "Select a database to delete",
-    //     options: dbs.map(({ database_name, database_id }) => ({
-    //       name: database_name,
-    //       value: database_id,
-    //     })),
-    //   });
-    // }
-
-    await http.request<Response>({
-      method: "DELETE",
-      authorization,
-      path: ["v2", "redis", "database", options.id!],
+export function registerDelete(redis: Command): void {
+  redis
+    .command("delete")
+    .description("Delete a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
+    .option("--dry-run", "Preview the action without executing it")
+    .action(async (flags: { dbId: string; dryRun?: boolean }, command: Command) => {
+      if (flags.dryRun) {
+        printJSON({ action: "delete", database_id: flags.dbId, dry_run: true });
+        return;
+      }
+      const auth = resolveAuth(command);
+      await request(auth, "DELETE", `/v2/redis/database/${flags.dbId}`);
+      printJSON({ deleted: true, database_id: flags.dbId });
     });
-    if (options.json) {
-      console.log(JSON.stringify({ ok: true }, null, 2));
-      return;
-    }
-    console.log(cliffy.colors.brightGreen("Database has been deleted"));
-    console.log();
-  });
+}

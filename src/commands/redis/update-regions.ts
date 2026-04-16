@@ -1,0 +1,18 @@
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON } from "../../output.js";
+import { REGIONS } from "../../types.js";
+
+export function registerUpdateRegions(redis: Command): void {
+  redis
+    .command("update-regions")
+    .description("Update read replica regions for a Redis database")
+    .requiredOption("--db-id <id>", "Database ID")
+    .requiredOption("--read-regions <regions...>", `Read replica regions. Available: ${REGIONS.join(", ")}`)
+    .action(async (flags: { dbId: string; readRegions: string[] }, command: Command) => {
+      const auth = resolveAuth(command);
+      const result = await request(auth, "POST", `/v2/redis/update-regions/${flags.dbId}`, { read_regions: flags.readRegions });
+      printJSON(result);
+    });
+}

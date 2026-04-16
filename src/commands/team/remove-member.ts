@@ -1,0 +1,22 @@
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON } from "../../output.js";
+
+export function registerTeamRemoveMember(team: Command): void {
+  team
+    .command("remove-member")
+    .description("Remove a member from a team")
+    .requiredOption("--team-id <id>", "Team ID")
+    .requiredOption("--member-email <email>", "Email of the member to remove")
+    .option("--dry-run", "Preview the action without executing it")
+    .action(async (flags: { dryRun?: boolean; teamId: string; memberEmail: string }, command: Command) => {
+      if (flags.dryRun) {
+        printJSON({ action: "remove-member", team_id: flags.teamId, member_email: flags.memberEmail, dry_run: true });
+        return;
+      }
+      const auth = resolveAuth(command);
+      await request(auth, "DELETE", "/v2/teams/member", { team_id: flags.teamId, member_email: flags.memberEmail });
+      printJSON({ removed: true, team_id: flags.teamId, member_email: flags.memberEmail });
+    });
+}

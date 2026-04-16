@@ -1,36 +1,16 @@
-import { cliffy } from "../../deps.ts";
-import { Command } from "../../util/command.ts";
-import { parseAuth } from "../../util/auth.ts";
-import { http } from "../../util/http.ts";
+import { Command } from "commander";
+import { resolveAuth } from "../../auth.js";
+import { request } from "../../client.js";
+import { printJSON } from "../../output.js";
+import type { Team } from "../../types.js";
 
-export const listCmd = new Command()
-  .name("list")
-  .description("list all your teams")
-  .example("List", "upstash team list")
-  .action(async (options): Promise<void> => {
-    const authorization = await parseAuth(options);
-
-    const teams = await http.request<{ team_name: string }[]>({
-      method: "GET",
-      authorization,
-      path: ["v2", "teams"],
+export function registerTeamList(team: Command): void {
+  team
+    .command("list")
+    .description("List all teams")
+    .action(async (flags: Record<string, never>, command: Command) => {
+      const auth = resolveAuth(command);
+      const teams = await request<Team[]>(auth, "GET", "/v2/teams");
+      printJSON(teams);
     });
-    if (options.json) {
-      console.log(JSON.stringify(teams, null, 2));
-      return;
-    }
-
-    teams.forEach((team) => {
-      console.log();
-      console.log();
-      console.log(
-        cliffy.colors.underline(cliffy.colors.brightGreen(team.team_name)),
-      );
-      console.log();
-      console.log(
-        cliffy.Table.from(
-          Object.entries(team).map(([k, v]) => [k.toString(), v.toString()]),
-        ).toString(),
-      );
-    });
-  });
+}

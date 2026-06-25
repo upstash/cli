@@ -20,8 +20,16 @@ export function getConfigPath(): string {
   return join(getConfigDir(), "config.json");
 }
 
-export function readConfig(): Auth | null {
-  const path = getConfigPath();
+// The 0.x CLI stored credentials at ~/.upstash.json with a camelCase `apiKey`.
+// We read it as a fallback so users upgrading to 1.x stay logged in. The path
+// is overridable for tests, mirroring UPSTASH_CONFIG_HOME.
+export function getLegacyConfigPath(): string {
+  const override = process.env.UPSTASH_LEGACY_CONFIG_HOME;
+  const base = override && override.length > 0 ? override : homedir();
+  return join(base, ".upstash.json");
+}
+
+function readConfigFile(path: string): Auth | null {
   if (!existsSync(path)) return null;
   let raw: string;
   try {
@@ -29,14 +37,20 @@ export function readConfig(): Auth | null {
   } catch {
     return null;
   }
-  let parsed: StoredConfig;
+  let parsed: StoredConfig & { apiKey?: string };
   try {
-    parsed = JSON.parse(raw) as StoredConfig;
+    parsed = JSON.parse(raw) as StoredConfig & { apiKey?: string };
   } catch {
     return null;
   }
-  if (!parsed.email || !parsed.api_key) return null;
-  return { email: parsed.email, apiKey: parsed.api_key };
+  // Accept the new snake_case `api_key` or the legacy camelCase `apiKey`.
+  const apiKey = parsed.api_key ?? parsed.apiKey;
+  if (!parsed.email || !apiKey) return null;
+  return { email: parsed.email, apiKey };
+}
+
+export function readConfig(): Auth | null {
+  return readConfigFile(getConfigPath()) ?? readConfigFile(getLegacyConfigPath());
 }
 
 export function writeConfig(auth: Auth): string {

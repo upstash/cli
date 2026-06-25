@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, statSync, readFileSync, existsSync } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
-import { readConfig, writeConfig, deleteConfig, getConfigPath } from "../../src/config.js";
+import { writeFileSync } from "node:fs";
+import { readConfig, writeConfig, deleteConfig, getConfigPath, getLegacyConfigPath } from "../../src/config.js";
 import { resolveAuth } from "../../src/auth.js";
 import { registerLogin } from "../../src/commands/login.js";
 import { registerLogout } from "../../src/commands/logout.js";
@@ -14,6 +15,7 @@ const originalEnv = { ...process.env };
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "upstash-cli-test-"));
   process.env.UPSTASH_CONFIG_HOME = dir;
+  process.env.UPSTASH_LEGACY_CONFIG_HOME = dir;
   delete process.env.UPSTASH_EMAIL;
   delete process.env.UPSTASH_API_KEY;
 });
@@ -45,6 +47,28 @@ describe("config file round-trip", () => {
     writeConfig({ email: "a@b.com", apiKey: "key-1" });
     expect(deleteConfig()).toBe(true);
     expect(existsSync(getConfigPath())).toBe(false);
+  });
+});
+
+describe("legacy ~/.upstash.json fallback", () => {
+  function writeLegacy(body: unknown): void {
+    writeFileSync(getLegacyConfigPath(), JSON.stringify(body));
+  }
+
+  it("reads the 0.x file (camelCase apiKey) when no new config exists", () => {
+    writeLegacy({ email: "legacy@b.com", apiKey: "legacy-key" });
+    expect(readConfig()).toEqual({ email: "legacy@b.com", apiKey: "legacy-key" });
+  });
+
+  it("prefers the new config over the legacy file", () => {
+    writeLegacy({ email: "legacy@b.com", apiKey: "legacy-key" });
+    writeConfig({ email: "new@b.com", apiKey: "new-key" });
+    expect(readConfig()).toEqual({ email: "new@b.com", apiKey: "new-key" });
+  });
+
+  it("ignores a legacy file that is missing a field", () => {
+    writeLegacy({ email: "legacy@b.com" });
+    expect(readConfig()).toBeNull();
   });
 });
 

@@ -16,12 +16,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Derive version from release tag
+        run: echo "VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
+      - name: Set package version from tag
+        run: echo $(jq --arg v "${{ env.VERSION }}" '(.version) = $v' package.json) > package.json
+
       - run: npm ci
+
+      - run: npm run build
 
       - name: Publish release candidate
         if: github.event.release.prerelease

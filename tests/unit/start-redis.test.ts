@@ -53,6 +53,14 @@ describe("start-redis", () => {
     expect(init?.headers).toEqual({ "Idempotency-Key": "db-123" });
   });
 
+  it("throws a plain error when the network is unreachable", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("getaddrinfo ENOTFOUND"));
+
+    await expect(run(["start-redis"])).rejects.toThrow(
+      "Could not reach https://upstash.com/start-redis: getaddrinfo ENOTFOUND",
+    );
+  });
+
   it("throws a plain error when the request fails", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("rate limited", { status: 429 }),

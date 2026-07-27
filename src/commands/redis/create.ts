@@ -9,7 +9,7 @@ export function registerCreate(redis: Command): void {
   redis
     .command("create")
     .description(
-      "Create a new Redis database. Needs an Upstash account; for a free throwaway database with no account, use `upstash start-redis`.",
+      "Create a new Redis database. Needs an Upstash account; for a free throwaway database with no account, use the start-redis command.",
     )
     .requiredOption("--name <name>", "Database name")
     .requiredOption("--region <region>", `Primary region. Available: ${REGIONS.join(", ")}`)

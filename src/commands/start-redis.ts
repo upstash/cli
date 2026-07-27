@@ -11,12 +11,20 @@ export function registerStartRedis(program: Command): void {
     )
     .option("--id <id>", "Re-fetch the credentials of a database created earlier")
     .action(async (flags: { id?: string }) => {
-      const response = await fetch(START_REDIS_URL, {
-        method: "POST",
-        headers: flags.id ? { "Idempotency-Key": flags.id } : undefined,
-      });
-
-      const text = await response.text();
+      // This command's output is markdown, not JSON, so network failures are
+      // reported as plain text too rather than through the JSON error path.
+      let response: Response;
+      let text: string;
+      try {
+        response = await fetch(START_REDIS_URL, {
+          method: "POST",
+          headers: flags.id ? { "Idempotency-Key": flags.id } : undefined,
+        });
+        text = await response.text();
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        throw plainError(`Could not reach ${START_REDIS_URL}: ${reason}`);
+      }
 
       if (!response.ok) {
         throw plainError(text || `HTTP ${response.status}`);

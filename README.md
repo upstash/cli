@@ -17,6 +17,16 @@ For agents, pair the CLI with the [Upstash Skill](https://docs.upstash.com/agent
 npx skills add upstash/skills
 ```
 
+## No account? Start with a free Redis
+
+If you are an AI agent (or just want to try things out) and need a Redis DB to use or experiment with, you don't need an Upstash account:
+
+```bash
+upstash start-redis
+```
+
+This prints markdown with credentials and a quickstart. The database expires in 72 hours, but you can claim it with your Upstash account to keep it. Pass `--id <database-id>` to re-fetch the credentials of a database you created earlier. Every command that touches your Upstash account needs authentication — only `start-redis` and the `login`/`logout` credential helpers do not.
+
 ## Authentication
 
 Grab a Developer API key from the [Upstash Console](https://console.upstash.com/account/api), then save it once per machine:
@@ -29,10 +39,11 @@ Or set `UPSTASH_EMAIL` and `UPSTASH_API_KEY` in your shell or a `.env` file. See
 
 ## Quick examples
 
-All output is JSON, so you can pipe to `jq`. Use `--dry-run` to preview destructive commands.
+Every command that returns account data outputs JSON, so you can pipe to `jq`. The exceptions are `start-redis`, which prints markdown, and `login`/`logout`, which print a plain-text confirmation. Use `--dry-run` to preview destructive commands.
 
 ```bash
 # Redis
+upstash start-redis  # free temporary DB, no account needed
 upstash redis list
 upstash redis create --name my-db --region us-east-1
 upstash redis exec --db-url $URL --db-token $TOKEN GET key

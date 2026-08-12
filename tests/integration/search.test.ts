@@ -51,9 +51,6 @@ describe("search rename", () => {
     const p2 = await createSearchProgram();
     const idx = await runCommand(p2, ["search", "get", "--index-id", indexId!]) as SearchIndex;
     expect(idx.name).toBe(newName);
-
-    const p3 = await createSearchProgram();
-    await runCommand(p3, ["search", "rename", "--index-id", indexId!, "--name", TEST_NAME]);
   });
 });
 

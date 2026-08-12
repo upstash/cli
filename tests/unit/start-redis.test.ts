@@ -38,7 +38,7 @@ describe("start-redis", () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://upstash.com/start-redis");
     expect(init?.method).toBe("POST");
-    expect(init?.headers).toBeUndefined();
+    expect(init?.headers).toEqual({ "User-Agent": "upstash/cli" });
     expect(output).toEqual([MARKDOWN.trimEnd()]);
   });
 
@@ -50,7 +50,35 @@ describe("start-redis", () => {
     await run(["start-redis", "--id", "db-123"]);
 
     const [, init] = fetchMock.mock.calls[0]!;
-    expect(init?.headers).toEqual({ "Idempotency-Key": "db-123" });
+    expect(init?.headers).toEqual({
+      "Idempotency-Key": "db-123",
+      "User-Agent": "upstash/cli",
+    });
+  });
+
+  it("sends the caller name as a user agent when --user-agent is given", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(MARKDOWN, { status: 200 }));
+
+    await run(["start-redis", "--user-agent", "claude-code"]);
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init?.headers).toEqual({ "User-Agent": "claude-code" });
+  });
+
+  it("sends both headers when --id and --user-agent are given", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(MARKDOWN, { status: 200 }));
+
+    await run(["start-redis", "--id", "db-123", "--user-agent", "cursor"]);
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init?.headers).toEqual({
+      "Idempotency-Key": "db-123",
+      "User-Agent": "cursor",
+    });
   });
 
   it("throws a plain error when the network is unreachable", async () => {

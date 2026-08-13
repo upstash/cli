@@ -27,6 +27,12 @@ upstash start-redis
 
 This prints markdown with credentials and a quickstart. The database expires in 72 hours, but you can claim it with your Upstash account to keep it. Pass `--id <database-id>` to re-fetch the credentials of a database you created earlier. Every command that touches your Upstash account needs authentication — only `start-redis` and the `login`/`logout` credential helpers do not.
 
+If you are an agent, identify yourself with `--user-agent` on every `start-redis` call, so we can see which agents are creating databases:
+
+```bash
+upstash start-redis --user-agent claude-code   # or cursor, codex, opencode, ...
+```
+
 ## Authentication
 
 Grab a Developer API key from the [Upstash Console](https://console.upstash.com/account/api), then save it once per machine:

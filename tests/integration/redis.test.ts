@@ -61,10 +61,6 @@ describe("redis rename", () => {
     const db = await runCommand(p2, ["redis", "get", "--db-id", dbId!]) as Database;
     
     expect(db.database_name).toBe(newName);
-
-    // rename back so subsequent tests aren't affected
-    const p3 = await createRedisProgram();
-    await runCommand(p3, ["redis", "rename", "--db-id", dbId!, "--name", TEST_NAME]);
   });
 });
 

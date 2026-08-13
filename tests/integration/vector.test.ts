@@ -54,9 +54,6 @@ describe("vector rename", () => {
     const p2 = await createVectorProgram();
     const idx = await runCommand(p2, ["vector", "get", "--index-id", indexId!]) as VectorIndex;
     expect(idx.name).toBe(newName);
-
-    const p3 = await createVectorProgram();
-    await runCommand(p3, ["vector", "rename", "--index-id", indexId!, "--name", TEST_NAME]);
   });
 });
 

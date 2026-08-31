@@ -7,6 +7,7 @@ import { registerTeam } from "./commands/team/index.js";
 import { registerVector } from "./commands/vector/index.js";
 import { registerSearch } from "./commands/search/index.js";
 import { registerQStash } from "./commands/qstash/index.js";
+import { registerBlob } from "./commands/blob/index.js";
 import { registerLogin } from "./commands/login.js";
 import { registerLogout } from "./commands/logout.js";
 import { registerStartRedis } from "./commands/start-redis.js";
@@ -46,5 +47,6 @@ registerTeam(program);
 registerVector(program);
 registerSearch(program);
 registerQStash(program);
+registerBlob(program);
 
 program.parseAsync().catch(handleError);

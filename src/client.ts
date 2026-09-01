@@ -23,7 +23,7 @@ export async function request<T>(
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/json",
-      ...telemetryHeaders,
+      ...telemetryHeaders(),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });

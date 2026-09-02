@@ -1,4 +1,5 @@
 import type { Auth } from "./auth.js";
+import { telemetryHeaders } from "./telemetry.js";
 
 const BASE_URL = "https://api.upstash.com";
 
@@ -22,6 +23,7 @@ export async function request<T>(
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/json",
+      ...telemetryHeaders(),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });

@@ -6,7 +6,10 @@ import type { Auth } from "./auth.js";
 interface StoredConfig {
   email?: string;
   api_key?: string;
+  telemetry_disabled?: boolean;
 }
+
+type RawConfig = StoredConfig & { apiKey?: string };
 
 export function getConfigDir(): string {
   const override = process.env.UPSTASH_CONFIG_HOME;
@@ -29,7 +32,7 @@ export function getLegacyConfigPath(): string {
   return join(base, ".upstash.json");
 }
 
-function readConfigFile(path: string): Auth | null {
+function readRawConfig(path: string): RawConfig | null {
   if (!existsSync(path)) return null;
   let raw: string;
   try {
@@ -37,12 +40,16 @@ function readConfigFile(path: string): Auth | null {
   } catch {
     return null;
   }
-  let parsed: StoredConfig & { apiKey?: string };
   try {
-    parsed = JSON.parse(raw) as StoredConfig & { apiKey?: string };
+    return JSON.parse(raw) as RawConfig;
   } catch {
     return null;
   }
+}
+
+function readConfigFile(path: string): Auth | null {
+  const parsed = readRawConfig(path);
+  if (!parsed) return null;
   // Accept the new snake_case `api_key` or the legacy camelCase `apiKey`.
   const apiKey = parsed.api_key ?? parsed.apiKey;
   if (!parsed.email || !apiKey) return null;
@@ -53,17 +60,52 @@ export function readConfig(): Auth | null {
   return readConfigFile(getConfigPath()) ?? readConfigFile(getLegacyConfigPath());
 }
 
-export function writeConfig(auth: Auth): string {
+function writeStoredConfig(body: StoredConfig): string {
   const path = getConfigPath();
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const body: StoredConfig = { email: auth.email, api_key: auth.apiKey };
   writeFileSync(path, JSON.stringify(body, null, 2) + "\n", { mode: 0o600 });
   return path;
 }
 
+export function writeConfig(auth: Auth): string {
+  const existing = readRawConfig(getConfigPath());
+  return writeStoredConfig({
+    email: auth.email,
+    api_key: auth.apiKey,
+    ...(existing?.telemetry_disabled === undefined
+      ? {}
+      : { telemetry_disabled: existing.telemetry_disabled }),
+  });
+}
+
+export function readTelemetryDisabled(): boolean {
+  return readRawConfig(getConfigPath())?.telemetry_disabled === true;
+}
+
+export function writeTelemetryDisabled(disabled: boolean): string {
+  const existing = readRawConfig(getConfigPath());
+  return writeStoredConfig({
+    ...(existing?.email === undefined ? {} : { email: existing.email }),
+    ...(existing?.api_key ?? existing?.apiKey
+      ? { api_key: existing.api_key ?? existing.apiKey }
+      : {}),
+    telemetry_disabled: disabled,
+  });
+}
+
+/**
+ * Drops the credentials, keeping any telemetry preference: logging out must not
+ * silently turn telemetry back on. Returns whether credentials were there.
+ */
 export function deleteConfig(): boolean {
   const path = getConfigPath();
-  if (!existsSync(path)) return false;
-  rmSync(path);
-  return true;
+  const existing = readRawConfig(path);
+  if (!existing) return false;
+  const hadCredentials = Boolean(existing.email && (existing.api_key ?? existing.apiKey));
+  if (existing.telemetry_disabled === undefined) {
+    rmSync(path);
+  } else {
+    writeStoredConfig({ telemetry_disabled: existing.telemetry_disabled });
+  }
+  return hadCredentials;
 }

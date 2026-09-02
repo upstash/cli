@@ -73,6 +73,38 @@ upstash team add-member --team-id $TEAM_ID --member-email you@example.com --role
 
 Run `upstash --help` (or `--help` on any subcommand) to discover everything else, and check the [full docs](https://upstash.com/docs/agent-resources/cli) for the complete catalog.
 
+## Telemetry
+
+The CLI identifies itself to the Upstash API on each request, so we can see which
+clients our endpoints are serving. It sends three headers and nothing else:
+
+| Header | Example |
+| --- | --- |
+| `Upstash-Telemetry-Sdk` | `@upstash/cli@1.2.0` |
+| `Upstash-Telemetry-Runtime` | `node@22.14.0` |
+| `Upstash-Telemetry-Platform` | `darwin` |
+
+That is the CLI version, the JS runtime, and the OS platform. No command
+arguments, credentials, resource names, or file paths are collected.
+
+To turn it off:
+
+```bash
+upstash telemetry disable   # saved to your config file
+upstash telemetry status    # check the current setting
+upstash telemetry enable    # turn it back on
+```
+
+Or set the environment variable every Upstash SDK honors, which also works from
+a `.env` file and takes precedence over the saved setting:
+
+```bash
+export UPSTASH_DISABLE_TELEMETRY=1
+```
+
+Disabling telemetry never affects what the CLI can do. `upstash logout` keeps
+the setting, so signing out does not quietly turn it back on.
+
 ## Contributing
 
 ```bash

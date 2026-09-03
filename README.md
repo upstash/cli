@@ -66,12 +66,17 @@ upstash search create --name my-search --region us-central1 --type DENSE
 upstash qstash list
 upstash qstash stats --qstash-id $QSTASH_ID --period 7d
 
+# Blob
+upstash blob create --name my-bucket --visibility private
+upstash blob list
+upstash blob credentials --bucket-id $BUCKET_ID
+
 # Team
 upstash team list
 upstash team add-member --team-id $TEAM_ID --member-email you@example.com --role dev
 ```
 
-Run `upstash --help` (or `--help` on any subcommand) to discover everything else, and check the [full docs](https://upstash.com/docs/agent-resources/cli) for the complete catalog.
+Run `upstash --help` (or `--help` on any subcommand) to discover everything else, and check the [full docs](https://upstash.com/docs/agent-resources/cli) for the complete catalog. `upstash blob credentials` returns temporary S3 credentials for use with AWS CLI, rclone, or an S3 SDK.
 
 ## Telemetry
 

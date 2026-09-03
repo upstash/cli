@@ -28,6 +28,13 @@ export async function createQStashProgram(): Promise<Command> {
   return p;
 }
 
+export async function createBlobProgram(): Promise<Command> {
+  const { registerBlob } = await import("../../src/commands/blob/index.js");
+  const p = new Command().exitOverride();
+  registerBlob(p);
+  return p;
+}
+
 export async function createTeamProgram(): Promise<Command> {
   const { registerTeam } = await import("../../src/commands/team/index.js");
   const p = new Command().exitOverride();

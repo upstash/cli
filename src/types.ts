@@ -171,3 +171,41 @@ export interface QStashUser {
   timeout?: number;
   creation_time?: number;
 }
+
+// ── Blob ─────────────────────────────────────────────────────────────────────
+
+export const BLOB_VISIBILITIES = ["private", "public"] as const;
+export type BlobVisibility = (typeof BLOB_VISIBILITIES)[number];
+
+export interface BlobBucketEvent {
+  type: string;
+  message: string;
+  observed_at: number;
+  [key: string]: unknown;
+}
+
+export interface BlobBucket {
+  customer_id: string;
+  id: string;
+  name: string;
+  hash_for_domain: string;
+  visibility: BlobVisibility;
+  endpoint: string;
+  pw_version: number;
+  creation_time: number;
+  cors?: string[];
+  created_by?: string;
+  events?: BlobBucketEvent[];
+  token?: string;
+  token_next?: string;
+}
+
+export interface BlobS3Credentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+  endpoint: string;
+  bucket: string;
+  region: string;
+  expiresAt: number;
+}

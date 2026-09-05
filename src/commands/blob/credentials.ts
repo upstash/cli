@@ -3,6 +3,13 @@ import { resolveAuth } from "../../auth.js";
 import { HttpError, request } from "../../client.js";
 import { printJSON } from "../../output.js";
 import type { BlobBucket, BlobS3Credentials } from "../../types.js";
+import {
+  isFreshlyCreated,
+  PROVISIONING_MAX_RETRIES,
+  PROVISIONING_RETRY_DELAY_MS,
+  sleep,
+} from "./retry.js";
+import type { Sleep } from "./retry.js";
 
 const BLOB_CREDENTIALS_URL = "https://blob.upstash.io/v1/credentials";
 const RETRYABLE_STATUSES = new Set([429, 503]);
@@ -10,10 +17,21 @@ const DEFAULT_RETRY_DELAY_MS = 2000;
 const MAX_RETRY_DELAY_MS = 10000;
 const MAX_RETRIES = 3;
 
-type Sleep = (ms: number) => Promise<void>;
+export interface FetchBlobCredentialsOptions {
+  /**
+   * How many times a 401 may be retried. A bucket that was created moments ago
+   * can exist in the Developer API before the Blob worker has provisioned it,
+   * and the worker answers 401 during that window.
+   */
+  unauthorizedRetries?: number;
+}
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function unauthorizedMessage(retriesUsed: number): string {
+  if (retriesUsed > 0) {
+    const waited = Math.round((retriesUsed * PROVISIONING_RETRY_DELAY_MS) / 1000);
+    return `Blob bucket token was rejected after waiting ${waited}s for the bucket to finish provisioning; retry in a minute or check the bucket in the console`;
+  }
+  return "Blob bucket token was rejected; if the bucket was created moments ago it may still be provisioning, wait a few seconds and retry";
 }
 
 function parseErrorMessage(text: string, status: number): string {
@@ -86,8 +104,13 @@ function validateCredentials(data: unknown): BlobS3Credentials {
 export async function fetchBlobCredentials(
   token: string,
   pause: Sleep = sleep,
+  options: FetchBlobCredentialsOptions = {},
 ): Promise<BlobS3Credentials> {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+  const unauthorizedRetries = options.unauthorizedRetries ?? 0;
+  let throttled = 0;
+  let unauthorized = 0;
+
+  for (;;) {
     const response = await fetch(BLOB_CREDENTIALS_URL, {
       method: "POST",
       headers: {
@@ -108,26 +131,42 @@ export async function fetchBlobCredentials(
     }
 
     if (response.status === 401) {
-      throw new HttpError("Blob bucket token was rejected", response.status);
+      if (unauthorized < unauthorizedRetries) {
+        unauthorized += 1;
+        await pause(PROVISIONING_RETRY_DELAY_MS);
+        continue;
+      }
+      throw new HttpError(unauthorizedMessage(unauthorized), response.status);
     }
 
-    if (RETRYABLE_STATUSES.has(response.status) && attempt < MAX_RETRIES) {
+    if (RETRYABLE_STATUSES.has(response.status) && throttled < MAX_RETRIES) {
+      throttled += 1;
       await pause(getRetryDelayMs(response.headers.get("Retry-After")));
       continue;
     }
 
     throw new HttpError(parseErrorMessage(text, response.status), response.status);
   }
-
-  throw new Error("Blob credentials request failed after retries");
 }
 
-function resolveBucketToken(flags: { bucketId?: string }, command: Command): Promise<string> {
+interface BucketTokenSource {
+  token: string;
+  /** Retry 401s for buckets that may still be provisioning; 0 for ambient tokens. */
+  unauthorizedRetries: number;
+}
+
+function resolveBucketToken(
+  flags: { bucketId?: string },
+  command: Command,
+): Promise<BucketTokenSource> {
   if (flags.bucketId) {
     const auth = resolveAuth(command);
     return request<BlobBucket>(auth, "GET", `/v2/blob/bucket/${flags.bucketId}`).then((bucket) => {
       if (typeof bucket.token === "string" && bucket.token.length > 0) {
-        return bucket.token;
+        return {
+          token: bucket.token,
+          unauthorizedRetries: isFreshlyCreated(bucket.creation_time) ? PROVISIONING_MAX_RETRIES : 0,
+        };
       }
       throw new Error(`Blob bucket ${flags.bucketId} did not return a current token`);
     });
@@ -135,7 +174,7 @@ function resolveBucketToken(flags: { bucketId?: string }, command: Command): Pro
 
   const token = process.env.UPSTASH_BLOB_TOKEN;
   if (typeof token === "string" && token.length > 0) {
-    return Promise.resolve(token);
+    return Promise.resolve({ token, unauthorizedRetries: 0 });
   }
 
   return Promise.reject(
@@ -152,9 +191,18 @@ export function registerBlobCredentials(blob: Command): void {
       "Get temporary S3 credentials for a Blob bucket; expiresAt is the credential expiry",
     )
     .option("--bucket-id <id>", "Blob bucket ID")
+    .addHelpText(
+      "after",
+      `
+With --bucket-id, a bucket created in the last few minutes is polled for up
+to ~30s until provisioning finishes, so it is safe to run right after create.
+`,
+    )
     .action(async (flags: { bucketId?: string }, command: Command) => {
-      const token = await resolveBucketToken(flags, command);
-      const credentials = await fetchBlobCredentials(token);
+      const source = await resolveBucketToken(flags, command);
+      const credentials = await fetchBlobCredentials(source.token, sleep, {
+        unauthorizedRetries: source.unauthorizedRetries,
+      });
       printJSON(credentials);
     });
 }

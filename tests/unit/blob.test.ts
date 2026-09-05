@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBlobProgram, runCommand } from "../helpers/program.js";
 import { fetchBlobCredentials } from "../../src/commands/blob/credentials.js";
+import { deleteBlobBucket } from "../../src/commands/blob/delete.js";
+import { isFreshlyCreated } from "../../src/commands/blob/retry.js";
 import type { BlobBucket, BlobS3Credentials } from "../../src/types.js";
 
 const originalEnv = { ...process.env };
@@ -317,6 +319,93 @@ describe("blob credentials command", () => {
     ).rejects.toThrow(/rejected/);
   });
 
+  it("401 hint mentions provisioning when no retries were allowed", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response('{"error":"unauthorized"}', { status: 401 }),
+    );
+
+    await expect(fetchBlobCredentials("token", async () => {})).rejects.toThrow(
+      /still be provisioning/,
+    );
+  });
+
+  it("retries 401 while a fresh bucket is provisioning, then succeeds", async () => {
+    const credentials = makeCredentials();
+    const delays: number[] = [];
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response('{"error":"unauthorized"}', { status: 401 }))
+      .mockResolvedValueOnce(new Response('{"error":"unauthorized"}', { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(credentials), { status: 200 }));
+
+    const result = await fetchBlobCredentials(
+      "bucket-token",
+      async (ms) => {
+        delays.push(ms);
+      },
+      { unauthorizedRetries: 10 },
+    );
+
+    expect(result).toEqual(credentials);
+    expect(delays).toEqual([3000, 3000]);
+  });
+
+  it("gives up on 401 after the provisioning retry budget and says how long it waited", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response('{"error":"unauthorized"}', { status: 401 }),
+    );
+
+    await expect(
+      fetchBlobCredentials("bucket-token", async () => {}, { unauthorizedRetries: 2 }),
+    ).rejects.toThrow(/rejected after waiting 6s/);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("401 retries do not consume the throttle retry budget", async () => {
+    const credentials = makeCredentials();
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("", { status: 401 }))
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response("", { status: 401 }))
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(credentials), { status: 200 }));
+
+    const result = await fetchBlobCredentials("t", async () => {}, { unauthorizedRetries: 2 });
+    expect(result).toEqual(credentials);
+  });
+
+  it("by bucket id does not retry 401 for a bucket that is not freshly created", async () => {
+    const bucket = makeBucket({ creation_time: 1 });
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(bucket), { status: 200 }))
+      .mockResolvedValue(new Response('{"error":"unauthorized"}', { status: 401 }));
+
+    const program = await createBlobProgram();
+    await expect(
+      runCommand(program, ["blob", "credentials", "--bucket-id", "bucket_123"]),
+    ).rejects.toThrow(/rejected/);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("by bucket id polls 401 for a freshly created bucket", async () => {
+    vi.useFakeTimers();
+    const bucket = makeBucket({ creation_time: Math.floor(Date.now() / 1000) });
+    const credentials = makeCredentials();
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(bucket), { status: 200 }))
+      .mockResolvedValueOnce(new Response('{"error":"unauthorized"}', { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(credentials), { status: 200 }));
+
+    const program = await createBlobProgram();
+    const pending = runCommand(program, ["blob", "credentials", "--bucket-id", "bucket_123"]);
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(await pending).toEqual(credentials);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
   it("retries 429 and 503 with retry-after or fallback delays, then succeeds", async () => {
     const credentials = makeCredentials();
     const delays: number[] = [];
@@ -347,5 +436,72 @@ describe("blob credentials command", () => {
       }),
     ).rejects.toThrow(/still busy/);
     expect(delays).toEqual([10000, 2000, 3000]);
+  });
+});
+
+describe("blob provisioning helpers", () => {
+  it("treats missing or recent creation times as freshly created", () => {
+    expect(isFreshlyCreated(undefined)).toBe(true);
+    expect(isFreshlyCreated(1000, 1000 + 60)).toBe(true);
+    expect(isFreshlyCreated(1000, 1000 + 5 * 60)).toBe(false);
+  });
+});
+
+describe("blob delete retries", () => {
+  const auth = { email: "user@example.com", apiKey: "api-key" };
+
+  it("retries 5xx while the bucket is provisioning, then succeeds", async () => {
+    const delays: number[] = [];
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response('{"error":"internal"}', { status: 500 }))
+      .mockResolvedValueOnce(new Response('"OK"', { status: 200 }));
+
+    await deleteBlobBucket(auth, "bucket_123", async (ms) => {
+      delays.push(ms);
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(delays).toEqual([3000]);
+  });
+
+  it("treats a 404 after a failed attempt as already deleted", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response('{"error":"internal"}', { status: 500 }))
+      .mockResolvedValueOnce(new Response('{"error":"resource not found"}', { status: 404 }));
+
+    await expect(deleteBlobBucket(auth, "bucket_123", async () => {})).resolves.toBeUndefined();
+  });
+
+  it("does not retry a first-attempt 404 or any 4xx", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response('{"error":"resource not found"}', { status: 404 }));
+    await expect(deleteBlobBucket(auth, "bucket_123", async () => {})).rejects.toThrow(/not found/);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockResolvedValueOnce(new Response('{"error":"bad"}', { status: 400 }));
+    await expect(deleteBlobBucket(auth, "bucket_123", async () => {})).rejects.toThrow(/bad/);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after the 5xx retry budget", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response('{"error":"internal"}', { status: 500 }),
+    );
+    await expect(deleteBlobBucket(auth, "bucket_123", async () => {})).rejects.toThrow(/internal/);
+    expect(fetchSpy).toHaveBeenCalledTimes(6);
+  });
+
+  it("delete command surfaces the retried result", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response('{"error":"internal"}', { status: 500 }))
+      .mockResolvedValueOnce(new Response('"OK"', { status: 200 }));
+
+    const program = await createBlobProgram();
+    const pending = runCommand(program, ["blob", "delete", "--bucket-id", "bucket_123"]);
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(await pending).toEqual({ deleted: true, bucket_id: "bucket_123" });
   });
 });

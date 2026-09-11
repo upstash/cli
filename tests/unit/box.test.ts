@@ -69,6 +69,29 @@ describe("upstash box", () => {
     expect(authHeaderOf().Authorization).toBe("Bearer a.b.c");
   });
 
+  it("uses the saved browser login even when Developer API key env vars are set", async () => {
+    writeOAuthClient({ issuer: ISSUER, client_id: "cid", redirect_uri: "http://127.0.0.1/callback", registered_at: now() });
+    writeOAuth({ issuer: ISSUER, access_token: "a.b.c", refresh_token: "rt", expires_at: now() + 86400 });
+    process.env.UPSTASH_EMAIL = "env@b.com";
+    process.env.UPSTASH_API_KEY = "k";
+    vi.spyOn(globalThis, "fetch").mockImplementation(okList);
+
+    await run(["box", "list", "--json"]);
+    expect(authHeaderOf().Authorization).toBe("Bearer a.b.c");
+  });
+
+  it("names the shadowing env vars when there is no browser login", async () => {
+    process.env.UPSTASH_EMAIL = "env@b.com";
+    process.env.UPSTASH_API_KEY = "k";
+    await expect(run(["box", "list"])).rejects.toThrow(/UPSTASH_EMAIL \/ UPSTASH_API_KEY are set/);
+  });
+
+  it("runs commands that need no credential without any login", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    await run(["box", "completion"]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("refuses a Developer API key login, and no login at all, with one message", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     await expect(run(["box", "list"])).rejects.toThrow(BOX_NEEDS_OAUTH_OR_BOX_KEY);

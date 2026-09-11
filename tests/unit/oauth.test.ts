@@ -127,10 +127,16 @@ describe("callback server", () => {
     server.close();
   });
 
-  it("surfaces an error parameter", async () => {
+  it("surfaces an error parameter, escaped in the page it shows", async () => {
     const server = await startCallbackServer({ state: "s1", issuer: ISSUER }, 5000);
-    await hit(server.redirectUri, { state: "s1", error: "access_denied", error_description: "User denied" });
-    await expect(server.code).rejects.toThrow(/User denied/);
+    const url = new URL(server.redirectUri);
+    url.searchParams.set("state", "s1");
+    url.searchParams.set("error", "access_denied");
+    url.searchParams.set("error_description", "<script>alert(1)</script> denied");
+    const html = await (await fetch(url)).text();
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+    await expect(server.code).rejects.toThrow(/denied/);
     server.close();
   });
 });
@@ -191,7 +197,7 @@ describe("refresh", () => {
     expect(readOAuth()?.refresh_token).toBe("rt-0");
   });
 
-  it("clears a stale lock left by a dead process", async () => {
+  it("clears a stale lock left by a dead process, by age or by a dead pid", async () => {
     const lock = join(dir, "stale.lock");
     writeFileSync(lock, "1");
     const old = Date.now() / 1000 - 120;
@@ -199,6 +205,21 @@ describe("refresh", () => {
     utimesSync(lock, old, old);
     expect(await withLock(lock, async () => "ran")).toBe("ran");
     expect(existsSync(lock)).toBe(false);
+
+    // Fresh lock file, but its holder pid no longer exists: reclaimed without waiting.
+    writeFileSync(lock, "999999999");
+    const started = Date.now();
+    expect(await withLock(lock, async () => "ran again")).toBe("ran again");
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(existsSync(lock)).toBe(false);
+  });
+
+  it("invalid_client ends the session and drops the saved client", async () => {
+    writeOAuth(tokens({ expires_at: now() + 60 }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ error: "invalid_client" }, 401));
+    await expect(getAccessToken()).rejects.toThrow(LOGIN_EXPIRED);
+    expect(readOAuth()).toBeNull();
+    expect(readOAuthClient()).toBeNull();
   });
 });
 

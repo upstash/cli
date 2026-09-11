@@ -1,8 +1,9 @@
-import { closeSync, openSync, statSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, openSync, readFileSync, statSync, unlinkSync, writeSync } from "node:fs";
 
 const RETRY_MS = 100;
-const WAIT_MS = 20_000;
+// A waiter must outlive the stale timeout, or a crashed holder's lock is never reclaimed.
 const STALE_MS = 30_000;
+const WAIT_MS = 45_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -18,9 +19,20 @@ function tryAcquire(lockPath: string): boolean {
   }
 }
 
+function holderIsDead(lockPath: string): boolean {
+  const pid = Number(readFileSync(lockPath, "utf8"));
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "ESRCH";
+  }
+}
+
 function removeIfStale(lockPath: string): void {
   try {
-    if (Date.now() - statSync(lockPath).mtimeMs > STALE_MS) unlinkSync(lockPath);
+    if (Date.now() - statSync(lockPath).mtimeMs > STALE_MS || holderIsDead(lockPath)) unlinkSync(lockPath);
   } catch {
     // Already gone: another process released it.
   }

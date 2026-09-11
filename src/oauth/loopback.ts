@@ -7,8 +7,11 @@ export interface CallbackServer {
   close(): void;
 }
 
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+
 const page = (title: string, body: string) =>
-  `<!doctype html><meta charset="utf-8"><title>Upstash CLI</title><body style="font-family:system-ui;margin:48px"><h1>${title}</h1><p>${body}</p></body>`;
+  `<!doctype html><meta charset="utf-8"><title>Upstash CLI</title><body style="font-family:system-ui;margin:48px"><h1>${title}</h1><p>${escapeHtml(body)}</p></body>`;
 
 function problemWith(q: URLSearchParams, expected: { state: string; issuer: string }): string | undefined {
   if (q.get("state") !== expected.state) return "the response did not match this login attempt (state mismatch)";

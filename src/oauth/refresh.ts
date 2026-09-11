@@ -1,4 +1,4 @@
-import { clearOAuth, getConfigPath, readOAuth, readOAuthClient, writeOAuth, type OAuthTokens } from "../config.js";
+import { clearOAuth, clearOAuthClient, getConfigPath, readOAuth, readOAuthClient, writeOAuth, type OAuthTokens } from "../config.js";
 import { plainError } from "../output.js";
 import { withLock } from "./lock.js";
 import { OAuthError, refreshTokens } from "./token.js";
@@ -26,6 +26,11 @@ async function refreshWithRetry(tokens: OAuthTokens, clientId: string): Promise<
     } catch (err) {
       if (err instanceof OAuthError && err.code === "invalid_grant") {
         clearOAuth();
+        throw plainError(LOGIN_EXPIRED);
+      }
+      if (err instanceof OAuthError && err.code === "invalid_client") {
+        clearOAuth();
+        clearOAuthClient();
         throw plainError(LOGIN_EXPIRED);
       }
       if (!isTransient(err) || attempt >= TRANSIENT_RETRIES) throw err;

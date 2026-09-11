@@ -35,13 +35,15 @@ upstash start-redis --user-agent claude-code   # or cursor, codex, opencode, ...
 
 ## Authentication
 
-Grab a Developer API key from the [Upstash Console](https://console.upstash.com/account/api), then save it once per machine:
+Sign in through the browser once per machine:
 
 ```bash
-upstash login
+upstash login --oauth
 ```
 
-Or set `UPSTASH_EMAIL` and `UPSTASH_API_KEY` in your shell or a `.env` file. See the [auth docs](https://upstash.com/docs/agent-resources/cli#authentication) for env files, per-command flags, and precedence rules.
+The consent page lets you pick a personal or team scope and whether the login is read-only. To switch teams, run it again. Team management commands (`team create`, `team delete`, `team add-member`, `team remove-member`) need an API key login.
+
+Or grab a Developer API key from the [Upstash Console](https://console.upstash.com/account/api) and save it with `upstash login`, or set `UPSTASH_EMAIL` and `UPSTASH_API_KEY` in your shell or a `.env` file (recommended for CI and agents). `upstash whoami` shows which credentials are in use. See the [auth docs](https://upstash.com/docs/agent-resources/cli#authentication) for env files, per-command flags, and precedence rules.
 
 ## Quick examples
 

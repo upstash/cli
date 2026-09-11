@@ -448,7 +448,7 @@ describe("blob provisioning helpers", () => {
 });
 
 describe("blob delete retries", () => {
-  const auth = { email: "user@example.com", apiKey: "api-key" };
+  const auth = { kind: "api-key" as const, email: "user@example.com", apiKey: "api-key" };
 
   it("retries 5xx while the bucket is provisioning, then succeeds", async () => {
     const delays: number[] = [];

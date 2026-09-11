@@ -33,7 +33,7 @@ describe("config file round-trip", () => {
   it("writes with 0600 perms and reads back", () => {
     const path = writeConfig({ email: "a@b.com", apiKey: "key-1" });
     expect(path).toBe(getConfigPath());
-    expect(readConfig()).toEqual({ email: "a@b.com", apiKey: "key-1" });
+    expect(readConfig()).toEqual({ kind: "api-key", email: "a@b.com", apiKey: "key-1" });
     if (process.platform !== "win32") {
       const mode = statSync(path).mode & 0o777;
       expect(mode).toBe(0o600);
@@ -57,13 +57,13 @@ describe("legacy ~/.upstash.json fallback", () => {
 
   it("reads the 0.x file (camelCase apiKey) when no new config exists", () => {
     writeLegacy({ email: "legacy@b.com", apiKey: "legacy-key" });
-    expect(readConfig()).toEqual({ email: "legacy@b.com", apiKey: "legacy-key" });
+    expect(readConfig()).toEqual({ kind: "api-key", email: "legacy@b.com", apiKey: "legacy-key" });
   });
 
   it("prefers the new config over the legacy file", () => {
     writeLegacy({ email: "legacy@b.com", apiKey: "legacy-key" });
     writeConfig({ email: "new@b.com", apiKey: "new-key" });
-    expect(readConfig()).toEqual({ email: "new@b.com", apiKey: "new-key" });
+    expect(readConfig()).toEqual({ kind: "api-key", email: "new@b.com", apiKey: "new-key" });
   });
 
   it("ignores a legacy file that is missing a field", () => {
@@ -79,14 +79,14 @@ describe("resolveAuth precedence", () => {
 
   it("falls back to the saved config file", () => {
     writeConfig({ email: "file@b.com", apiKey: "file-key" });
-    expect(resolveAuth({})).toEqual({ email: "file@b.com", apiKey: "file-key" });
+    expect(resolveAuth({})).toEqual({ kind: "api-key", email: "file@b.com", apiKey: "file-key" });
   });
 
   it("env vars beat the saved config file", () => {
     writeConfig({ email: "file@b.com", apiKey: "file-key" });
     process.env.UPSTASH_EMAIL = "env@b.com";
     process.env.UPSTASH_API_KEY = "env-key";
-    expect(resolveAuth({})).toEqual({ email: "env@b.com", apiKey: "env-key" });
+    expect(resolveAuth({})).toEqual({ kind: "api-key", email: "env@b.com", apiKey: "env-key" });
   });
 
   it("refuses to mix a partial session tier with the saved config", () => {
@@ -101,6 +101,7 @@ describe("resolveAuth precedence", () => {
     process.env.UPSTASH_EMAIL = "env@b.com";
     process.env.UPSTASH_API_KEY = "env-key";
     expect(resolveAuth({ email: "flag@b.com", apiKey: "flag-key" })).toEqual({
+      kind: "api-key",
       email: "flag@b.com",
       apiKey: "flag-key",
     });
@@ -138,7 +139,7 @@ describe("login / logout commands (flag form)", () => {
       const output = await captureStdout(p, ["login", "--email", "cli@b.com", "--api-key", "cli-key"]);
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(output).toBe(`Credentials verified and saved to ${getConfigPath()}`);
-      expect(readConfig()).toEqual({ email: "cli@b.com", apiKey: "cli-key" });
+      expect(readConfig()).toEqual({ kind: "api-key", email: "cli@b.com", apiKey: "cli-key" });
     } finally {
       fetchSpy.mockRestore();
     }

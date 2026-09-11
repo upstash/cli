@@ -41,7 +41,7 @@ Sign in through the browser once per machine:
 upstash login --oauth
 ```
 
-The consent page lets you pick a personal or team scope and whether the login is read-only. To switch teams, run it again. Team management commands (`team create`, `team delete`, `team add-member`, `team remove-member`) need an API key login.
+The consent page lets you pick a personal or team scope and whether the login is read-only. To switch teams, run it again. Team management commands (`team create`, `team delete`, `team add-member`, `team remove-member`) need an API key login. `upstash box` commands work with a browser login or a Box API key (`UPSTASH_BOX_API_KEY` or `--token`), not with a Developer API key.
 
 Or grab a Developer API key from the [Upstash Console](https://console.upstash.com/account/api) and save it with `upstash login`, or set `UPSTASH_EMAIL` and `UPSTASH_API_KEY` in your shell or a `.env` file (recommended for CI and agents). `upstash whoami` shows which credentials are in use. See the [auth docs](https://upstash.com/docs/agent-resources/cli#authentication) for env files, per-command flags, and precedence rules.
 
@@ -55,6 +55,11 @@ upstash start-redis  # free temporary DB, no account needed
 upstash redis list
 upstash redis create --name my-db --region us-east-1
 upstash redis exec --db-url $URL --db-token $TOKEN GET key
+
+# Upstash Box (browser login or a Box API key; same commands as the `box` CLI)
+upstash box list
+upstash box create --name my-box
+upstash box exec --box my-box -- ls
 
 # Vector
 upstash vector list

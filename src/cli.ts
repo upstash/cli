@@ -8,6 +8,7 @@ import { registerVector } from "./commands/vector/index.js";
 import { registerSearch } from "./commands/search/index.js";
 import { registerQStash } from "./commands/qstash/index.js";
 import { registerBlob } from "./commands/blob/index.js";
+import { registerBox } from "./commands/box.js";
 import { registerLogin } from "./commands/login.js";
 import { registerLogout } from "./commands/logout.js";
 import { registerWhoami } from "./commands/whoami.js";
@@ -52,5 +53,6 @@ registerVector(program);
 registerSearch(program);
 registerQStash(program);
 registerBlob(program);
+registerBox(program);
 
 program.parseAsync().catch(handleError);

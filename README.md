@@ -7,6 +7,8 @@ Agent-friendly CLI for managing & debugging Upstash resources from your terminal
 
 ## Installation
 
+Requires Node.js 20 or newer.
+
 ```bash
 npm i -g @upstash/cli
 ```
@@ -70,6 +72,7 @@ upstash qstash stats --qstash-id $QSTASH_ID --period 7d
 upstash blob create --name my-bucket --visibility private
 upstash blob list
 upstash blob credentials --bucket-id $BUCKET_ID
+upstash blob upload ./assets --bucket-id $BUCKET_ID --prefix assets
 
 # Team
 upstash team list
@@ -77,6 +80,45 @@ upstash team add-member --team-id $TEAM_ID --member-email you@example.com --role
 ```
 
 Run `upstash --help` (or `--help` on any subcommand) to discover everything else, and check the [full docs](https://upstash.com/docs/agent-resources/cli) for the complete catalog. `upstash blob credentials` returns temporary S3 credentials for use with AWS CLI, rclone, or an S3 SDK.
+
+## Uploading Blob files and folders
+
+Set `UPSTASH_BLOB_TOKEN` in your environment or `.env` file, then run:
+
+```bash
+upstash blob upload ./assets --prefix assets
+```
+
+Alternatively, use `--bucket-id $BUCKET_ID` with your saved Upstash login or
+Developer API credentials. AWS CLI and manually exported S3 credentials are not
+needed. A directory uploads its contents recursively: `./assets/images/logo.png`
+becomes `assets/images/logo.png` with the prefix above, or `images/logo.png` without
+a prefix. A single file uploads under its filename. Content types are inferred
+from filenames, falling back to `application/octet-stream`.
+
+The Blob SDK streams files, uses multipart for large files, and refreshes temporary
+credentials throughout the upload, including between parts of one large file.
+Transient failures are retried. Four files upload concurrently by default; use
+`--concurrency 1` to reduce memory usage. Progress goes to stderr and the final JSON
+summary goes to stdout. `--quiet` suppresses progress.
+
+```bash
+upstash blob upload ./assets --prefix assets --dry-run
+upstash blob upload ./assets --prefix assets --skip-existing
+```
+
+`--dry-run` lists local files and destination paths without authenticating or
+making network requests. By default existing keys are overwritten. `--skip-existing`
+skips any existing key **without comparing size or contents**; use it to rerun an
+interrupted upload only when the already uploaded objects are the versions you want.
+An incomplete individual file starts again on rerun. Files are not deleted from the
+bucket. Symlinks and empty directories are skipped.
+
+On a failed file, the command stops scheduling more files, waits for active uploads,
+prints a summary with failed and remaining files, and exits unsuccessfully. Ctrl+C
+stops scheduling work and closes local streams; in-flight requests may take time
+to settle. Completed objects remain in the bucket. An abrupt process kill may leave
+incomplete multipart parts for the bucket's lifecycle cleanup.
 
 ## Telemetry
 

@@ -64,6 +64,7 @@ describe("blob command registration", () => {
       "get",
       "delete",
       "credentials",
+      "upload",
     ]);
   });
 });

@@ -155,7 +155,7 @@ interface BucketTokenSource {
   unauthorizedRetries: number;
 }
 
-function resolveBucketToken(
+export function resolveBucketToken(
   flags: { bucketId?: string },
   command: Command,
 ): Promise<BucketTokenSource> {

@@ -13,6 +13,8 @@ const originalEnv = { ...process.env };
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), "blob-upload-test-"));
   delete process.env.UPSTASH_BLOB_TOKEN;
+  delete process.env.UPSTASH_EMAIL;
+  delete process.env.UPSTASH_API_KEY;
   vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected network request in offline test"));
 });
 
@@ -155,16 +157,20 @@ describe("upload scheduling", () => {
 });
 
 describe("real SDK with offline storage transport", () => {
-  it("runs the command with a bucket token, streams a small file, and returns JSON", async () => {
+  it.each(["environment", "flag"])("uploads with a %s bucket token and no management credentials", async (source) => {
     await writeFile(join(directory, "hello.txt"), "hello");
-    process.env.UPSTASH_BLOB_TOKEN = token();
+    const bucketToken = token();
+    process.env.UPSTASH_BLOB_TOKEN = source === "environment" ? bucketToken : "ignored-ambient-token";
     const uploaded: string[] = [];
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const url = new URL(String(input));
-      if (url.hostname === "blob.upstash.io") return Response.json({
-        accessKeyId: "key", secretAccessKey: "secret", sessionToken: "session", expiresAt: Date.now() / 1000 + 600,
-        endpoint: "https://fixture.r2.cloudflarestorage.com", bucket: "fixture-bucket", region: "auto",
-      });
+      if (url.hostname === "blob.upstash.io") {
+        expect(new Headers(init?.headers).get("authorization")).toBe(`Bearer ${bucketToken}`);
+        return Response.json({
+          accessKeyId: "key", secretAccessKey: "secret", sessionToken: "session", expiresAt: Date.now() / 1000 + 600,
+          endpoint: "https://fixture.r2.cloudflarestorage.com", bucket: "fixture-bucket", region: "auto",
+        });
+      }
       if (url.hostname !== "fixture.r2.cloudflarestorage.com") throw new Error("Unexpected host");
       expect(new Headers(init?.headers).get("content-type")).toBe("text/plain");
       expect(init?.method).toBe("PUT");
@@ -172,9 +178,25 @@ describe("real SDK with offline storage transport", () => {
       uploaded.push(url.pathname);
       return new Response(null, { headers: { etag: '"hello"' } });
     });
-    const result = await runCommand(await createBlobProgram(), ["blob", "upload", directory, "--prefix", "assets", "--quiet"]);
+    const flags = source === "flag" ? ["--token", bucketToken] : [];
+    const result = await runCommand(await createBlobProgram(), ["blob", "upload", directory, "--prefix", "assets", "--quiet", ...flags]);
     expect(result).toEqual({ uploaded: 1, skipped: 0, bytes: 5, failed: [], remaining: 0 });
     expect(uploaded).toEqual(["/fixture-bucket/assets/hello.txt"]);
+  });
+
+  it("rejects an empty explicit token instead of falling back to ambient credentials", async () => {
+    await writeFile(join(directory, "hello.txt"), "hello");
+    process.env.UPSTASH_BLOB_TOKEN = token();
+    await expect(runCommand(await createBlobProgram(), ["blob", "upload", directory, "--token", " "]))
+      .rejects.toThrow("--token must be a non-empty");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects conflicting explicit bucket selectors without making a request", async () => {
+    await writeFile(join(directory, "hello.txt"), "hello");
+    await expect(runCommand(await createBlobProgram(), ["blob", "upload", directory, "--token", token(), "--bucket-id", "another-bucket"]))
+      .rejects.toThrow("Use either --token or --bucket-id");
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("refreshes credentials between multipart parts after the original credentials expire", async () => {

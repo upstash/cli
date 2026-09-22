@@ -89,9 +89,24 @@ Set `UPSTASH_BLOB_TOKEN` in your environment or `.env` file, then run:
 upstash blob upload ./assets --prefix assets
 ```
 
+No Upstash login, account email, or management API key is required when using a
+bucket token. You can also provide the token explicitly or select another env file:
+
+```bash
+upstash blob upload ./assets --token "$BLOB_TOKEN" --prefix assets
+upstash --env-path ./uploads.env blob upload ./assets --prefix assets
+upstash blob credentials --token "$BLOB_TOKEN"
+```
+
+`--token` overrides `UPSTASH_BLOB_TOKEN`. Exported environment variables take
+precedence over values loaded from `.env` or `--env-path`. Use the Blob bucket
+token, not temporary S3 credentials, so the CLI can refresh credentials throughout
+the transfer.
+
 Alternatively, use `--bucket-id $BUCKET_ID` with your saved Upstash login or
-Developer API credentials. AWS CLI and manually exported S3 credentials are not
-needed. A directory uploads its contents recursively: `./assets/images/logo.png`
+Developer API credentials. An explicit bucket ID overrides the ambient token;
+`--token` and `--bucket-id` cannot be combined. AWS CLI and manually exported S3
+credentials are not needed. A directory uploads its contents recursively: `./assets/images/logo.png`
 becomes `assets/images/logo.png` with the prefix above, or `images/logo.png` without
 a prefix. A single file uploads under its filename. Content types are inferred
 from filenames, falling back to `application/octet-stream`.

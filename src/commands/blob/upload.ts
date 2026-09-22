@@ -27,6 +27,7 @@ export interface UploadSummary {
 
 interface UploadOptions {
   bucketId?: string;
+  token?: string;
   prefix: string;
   concurrency: number;
   skipExisting?: boolean;
@@ -143,6 +144,7 @@ export function registerBlobUpload(blob: Command): void {
   blob.command("upload <source>")
     .description("Upload a file or directory with automatic credential refresh")
     .option("--bucket-id <id>", "Blob bucket ID (otherwise uses UPSTASH_BLOB_TOKEN)")
+    .option("--token <token>", "Blob bucket token; no management API key needed (overrides UPSTASH_BLOB_TOKEN)")
     .option("--prefix <prefix>", "Destination prefix; directories upload their contents", "")
     .option("--concurrency <count>", "Number of files uploaded concurrently (1-16)", concurrency, 4)
     .option("--skip-existing", "Skip keys already present, without comparing contents")

@@ -33,12 +33,7 @@ jobs:
 
       - name: Publish release candidate
         if: github.event.release.prerelease
-        env:
-          RELEASE_VERSION: ${{ env.VERSION }}
-        run: |
-          tag=next
-          if [[ "$RELEASE_VERSION" == *-canary.* ]]; then tag=canary; fi
-          npm publish --access public --tag "$tag" --provenance
+        run: npm publish --access public --tag=canary --provenance
 
       - name: Publish
         if: "!github.event.release.prerelease"

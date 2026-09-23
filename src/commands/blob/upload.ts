@@ -170,8 +170,8 @@ so use it only when existing objects are already the versions you want.
       if (unauthorizedRetries > 0) await fetchBlobCredentials(token, sleep, { unauthorizedRetries });
       const bucket = new Bucket({ token, enableTelemetry: telemetryStatus().enabled });
       const controller = new AbortController();
-      // Each in-flight read stream adds an abort listener; concurrency is capped at 16.
-      setMaxListeners(20, controller.signal);
+      // Each read stream adds an abort listener, removed only once it closes.
+      setMaxListeners(0, controller.signal);
       const interrupt = (): void => controller.abort();
       process.once("SIGINT", interrupt);
       process.once("SIGTERM", interrupt);

@@ -184,6 +184,32 @@ describe("real SDK with offline storage transport", () => {
     expect(uploaded).toEqual(["/fixture-bucket/assets/hello.txt"]);
   });
 
+  it("waits for a freshly created bucket to finish provisioning", async () => {
+    await writeFile(join(directory, "hello.txt"), "hello");
+    process.env.UPSTASH_EMAIL = "user@example.com";
+    process.env.UPSTASH_API_KEY = "api-key";
+    const bucketToken = token();
+    let mints = 0;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/v2/blob/bucket/bucket_123")) {
+        return Response.json({ id: "bucket_123", token: bucketToken, creation_time: Date.now() / 1000 });
+      }
+      if (url.hostname === "blob.upstash.io") {
+        if (++mints === 1) return new Response('{"error":"unauthorized"}', { status: 401 });
+        return Response.json({
+          accessKeyId: "key", secretAccessKey: "secret", sessionToken: "session", expiresAt: Date.now() / 1000 + 600,
+          endpoint: "https://fixture.r2.cloudflarestorage.com", bucket: "fixture-bucket", region: "auto",
+        });
+      }
+      if (url.hostname !== "fixture.r2.cloudflarestorage.com") throw new Error("Unexpected host");
+      return new Response(null, { headers: { etag: '"hello"' } });
+    });
+    const result = await runCommand(await createBlobProgram(), ["blob", "upload", directory, "--bucket-id", "bucket_123", "--quiet"]);
+    expect(result).toEqual({ uploaded: 1, skipped: 0, bytes: 5, failed: [], remaining: 0 });
+    expect(mints).toBeGreaterThan(1);
+  }, 10_000);
+
   it("rejects an empty explicit token instead of falling back to ambient credentials", async () => {
     await writeFile(join(directory, "hello.txt"), "hello");
     process.env.UPSTASH_BLOB_TOKEN = token();

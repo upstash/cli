@@ -1,5 +1,6 @@
 import { BlobError, Bucket } from "@upstash/blob";
 import { Command, InvalidArgumentError } from "commander";
+import { setMaxListeners } from "node:events";
 import { createReadStream } from "node:fs";
 import { lstat, opendir } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
@@ -7,7 +8,7 @@ import { Readable } from "node:stream";
 import mime from "mime";
 import { printJSON } from "../../output.js";
 import { telemetryStatus } from "../../telemetry.js";
-import { resolveBucketToken } from "./credentials.js";
+import { fetchBlobCredentials, resolveBucketToken } from "./credentials.js";
 import { sleep } from "./retry.js";
 
 export interface UploadFile {
@@ -164,9 +165,13 @@ so use it only when existing objects are already the versions you want.
         return;
       }
       if (files.length === 0) throw new Error("source contains no regular files to upload");
-      const { token } = await resolveBucketToken(options, command);
+      const { token, unauthorizedRetries } = await resolveBucketToken(options, command);
+      // A bucket created moments ago answers 401 until provisioning finishes.
+      if (unauthorizedRetries > 0) await fetchBlobCredentials(token, sleep, { unauthorizedRetries });
       const bucket = new Bucket({ token, enableTelemetry: telemetryStatus().enabled });
       const controller = new AbortController();
+      // Each in-flight read stream adds an abort listener; concurrency is capped at 16.
+      setMaxListeners(20, controller.signal);
       const interrupt = (): void => controller.abort();
       process.once("SIGINT", interrupt);
       process.once("SIGTERM", interrupt);

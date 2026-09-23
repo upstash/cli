@@ -20,6 +20,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
   process.env = { ...originalEnv };
   await rm(directory, { recursive: true, force: true });
 });
@@ -205,10 +206,13 @@ describe("real SDK with offline storage transport", () => {
       if (url.hostname !== "fixture.r2.cloudflarestorage.com") throw new Error("Unexpected host");
       return new Response(null, { headers: { etag: '"hello"' } });
     });
-    const result = await runCommand(await createBlobProgram(), ["blob", "upload", directory, "--bucket-id", "bucket_123", "--quiet"]);
-    expect(result).toEqual({ uploaded: 1, skipped: 0, bytes: 5, failed: [], remaining: 0 });
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    const pending = runCommand(await createBlobProgram(), ["blob", "upload", directory, "--bucket-id", "bucket_123", "--quiet"]);
+    await vi.waitFor(() => expect(mints).toBe(1));
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await pending).toEqual({ uploaded: 1, skipped: 0, bytes: 5, failed: [], remaining: 0 });
     expect(mints).toBeGreaterThan(1);
-  }, 10_000);
+  });
 
   it("rejects an empty explicit token instead of falling back to ambient credentials", async () => {
     await writeFile(join(directory, "hello.txt"), "hello");

@@ -132,9 +132,9 @@ bucket. Symlinks and empty directories are skipped.
 On a failed file, the command stops scheduling more files, waits for active uploads,
 prints a summary with failed and remaining files, and exits unsuccessfully. Ctrl+C
 stops scheduling work and closes local streams; in-flight requests may take time
-to settle. Completed objects remain in the bucket. An abrupt process kill may leave
-an incomplete multipart upload, which does not expire on its own; remove it with the
-Blob SDK's `abortStaleMultipartUploads`.
+to settle. Completed objects remain in the bucket. A process kill, or a network
+failure that also blocks cleanup, may leave an incomplete multipart upload. It does
+not expire on its own; remove it with the Blob SDK's `abortStaleMultipartUploads`.
 
 ## Telemetry
 

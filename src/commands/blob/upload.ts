@@ -79,7 +79,8 @@ function retryable(error: unknown): boolean {
   return BlobError.is(error) && (
     error.code === "rate_limited" || error.code === "not_ready" ||
     (error.status !== undefined && error.status >= 500)
-  ) || error instanceof TypeError && error.message === "fetch failed";
+  ) || error instanceof TypeError && (error.message === "fetch failed" || error.message === "terminated") ||
+    error instanceof Error && error.name === "TimeoutError";
 }
 
 export async function uploadFiles(

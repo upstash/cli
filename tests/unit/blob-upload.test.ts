@@ -146,6 +146,21 @@ describe("upload scheduling", () => {
     expect(bodies[0]).not.toBe(bodies[1]);
   });
 
+  it("retries a credential request that timed out", async () => {
+    await writeFile(join(directory, "file.txt"), "hello");
+    let attempts = 0;
+    const bucket = {
+      exists: vi.fn(),
+      put: vi.fn(async () => {
+        if (++attempts === 1) throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+        return {};
+      }),
+    } as unknown as Pick<Bucket, "put" | "exists">;
+    const summary = await uploadFiles(bucket, await planUpload(directory, ""), { concurrency: 1 }, () => {});
+    expect(summary.uploaded).toBe(1);
+    expect(attempts).toBe(2);
+  });
+
   it("does not start work after cancellation", async () => {
     await writeFile(join(directory, "file.txt"), "hello");
     const controller = new AbortController();

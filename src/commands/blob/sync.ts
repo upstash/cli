@@ -3,6 +3,7 @@ import { BucketResolver } from "./buckets.js";
 import {
   addCommonOptions,
   addObjectOptions,
+  checkOverwritesSource,
   claimLocal,
   destinationFor,
   executePlan,
@@ -84,7 +85,8 @@ Examples:
         prefix === undefined || entry.location.type !== "blob" || !entry.location.key.startsWith(prefix);
       const included = (entry: Entry): boolean =>
         isIncluded(entry.rel, filters) && !(destination.type === "local" && entry.rel.endsWith("/"));
-      // With nested prefixes in one bucket, neither side's listing includes the other side's keys.
+      // With nested prefixes in one bucket, neither side's listing includes the other side's keys,
+      // and a copy onto a source key is refused.
       const current = new Map(existing.filter((entry) => included(entry) && outside(entry, sourceInside))
         .map((entry) => [entry.rel, entry]));
 
@@ -101,6 +103,7 @@ Examples:
         try {
           const to = target?.location ?? destinationFor(entry, destination, true);
           claimLocal(claimed, to);
+          checkOverwritesSource(to, sourceInside);
           if (target && !needsSync(entry, target, action, options)) {
             unchanged++;
             continue;

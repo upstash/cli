@@ -1,12 +1,13 @@
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BucketResolver, tokenBucketId } from "../../src/commands/blob/buckets.js";
 import { needsSync } from "../../src/commands/blob/sync.js";
 import {
+  checkOverwritesSource,
   claimLocal,
   destinationFor,
   dirPrefix,
@@ -107,6 +108,13 @@ describe("local collisions", () => {
     await expect(nestedPrefix(at("a"), at("ab"), resolver)).resolves.toBeUndefined();
     await expect(nestedPrefix({ type: "local", path: "." }, at("x"), resolver)).resolves.toBeUndefined();
   });
+
+  it("refuses copies onto keys below the source prefix", () => {
+    const at = (key: string) => ({ type: "blob" as const, bucket: "b", key });
+    expect(() => checkOverwritesSource(at("x/1"), "x/")).toThrow("also a source");
+    expect(() => checkOverwritesSource(at("1"), "x/")).not.toThrow();
+    expect(() => checkOverwritesSource(at("x/1"), undefined)).not.toThrow();
+  });
 });
 
 describe("folder markers", () => {
@@ -166,6 +174,22 @@ describe("filters", () => {
       }],
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("local listing", () => {
+  it("follows symbolic links like aws s3, skipping loops and dangling links", async () => {
+    const source = join(directory, "src");
+    await mkdir(join(directory, "real"), { recursive: true });
+    await mkdir(source);
+    await writeFile(join(directory, "real", "a.txt"), "a");
+    await symlink(join(directory, "real"), join(source, "linked"));
+    await symlink(source, join(source, "loop"));
+    await symlink(join(directory, "missing"), join(source, "dangling"));
+    const result = await runCommand(await createBlobProgram(), [
+      "blob", "cp", source, "blob://bucket/dest", "--recursive", "--dryrun", "--quiet",
+    ]) as { operations: { destination: string }[] };
+    expect(result.operations.map((operation) => operation.destination)).toEqual(["blob://bucket/dest/linked/a.txt"]);
   });
 });
 

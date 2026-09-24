@@ -5,7 +5,7 @@ import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { setMaxListeners } from "node:events";
 import { createWriteStream } from "node:fs";
-import { lstat, mkdir, opendir, rename, rm, stat, unlink, utimes } from "node:fs/promises";
+import { mkdir, opendir, realpath, rename, rm, stat, unlink, utimes } from "node:fs/promises";
 import { basename, dirname, join, posix, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -191,24 +191,30 @@ function errorCode(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException | undefined)?.code;
 }
 
+/** Symbolic links are followed as aws s3 does; one that loops back to its own ancestor is skipped. */
 async function walk(root: string): Promise<Entry[]> {
   const entries: Entry[] = [];
-  const visit = async (directory: string): Promise<void> => {
+  const visit = async (directory: string, ancestors: Set<string>): Promise<void> => {
+    const real = await realpath(directory);
+    if (ancestors.has(real)) return;
+    const chain = new Set(ancestors).add(real);
     for await (const dirent of await opendir(directory)) {
       const path = join(directory, dirent.name);
-      if (dirent.isDirectory()) await visit(path);
-      else if (dirent.isFile()) {
-        const info = await lstat(path);
+      // A dangling link has nothing to copy.
+      const info = dirent.isSymbolicLink() ? await stat(path).catch(() => undefined) : dirent;
+      if (info?.isDirectory()) await visit(path, chain);
+      else if (info?.isFile()) {
+        const { size, mtimeMs } = await stat(path);
         entries.push({
           rel: relative(root, path).split(sep).join("/"),
-          size: info.size,
-          mtime: info.mtimeMs,
+          size,
+          mtime: mtimeMs,
           location: { type: "local", path },
         });
       }
     }
   };
-  await visit(root);
+  await visit(root, new Set());
   return entries;
 }
 
@@ -241,7 +247,7 @@ export async function listSource(location: Location, recursive: boolean, resolve
   if (location.type === "local") {
     let info;
     try {
-      info = await lstat(location.path);
+      info = await stat(location.path);
     } catch (error) {
       if (errorCode(error) === "ENOENT") throw new Error(`${location.path} does not exist`);
       throw error;
@@ -250,7 +256,7 @@ export async function listSource(location: Location, recursive: boolean, resolve
       if (!recursive) throw new Error(`${location.path} is a directory; use --recursive`);
       return walk(location.path);
     }
-    if (!info.isFile()) throw new Error(`${location.path} is not a regular file; symbolic links are not followed`);
+    if (!info.isFile()) throw new Error(`${location.path} is not a regular file`);
     if (recursive) throw new Error(`${location.path} is a file; --recursive needs a directory`);
     return [{ rel: basename(location.path), size: info.size, mtime: info.mtimeMs, location }];
   }
@@ -275,7 +281,7 @@ export async function listDestination(location: Location, resolver: BucketResolv
     return listBlobs(await resolver.open(location.bucket), location, dirPrefix(location.key));
   }
   try {
-    const info = await lstat(location.path);
+    const info = await stat(location.path);
     if (!info.isDirectory()) throw new Error(`${location.path} is not a directory`);
   } catch (error) {
     if (errorCode(error) === "ENOENT") return [];
@@ -360,8 +366,9 @@ export function claimLocal(claimed: Set<string>, destination: Location): void {
 }
 
 /**
- * When `inner` is a prefix nested inside `outer` in the same bucket, returns it so the outer
- * listing can skip those keys: `mv blob://b/ blob://b/archive/` must not move its own output.
+ * When `inner` is a prefix nested inside `outer` in the same bucket, returns it. With the
+ * destination inside, the source listing skips those keys: `mv blob://b/ blob://b/archive/` must
+ * not move its own output. With the source inside, copies onto keys below it are refused.
  */
 export async function nestedPrefix(outer: Location, inner: Location, resolver: BucketResolver): Promise<string | undefined> {
   if (outer.type !== "blob" || inner.type !== "blob") return undefined;
@@ -373,6 +380,13 @@ export async function nestedPrefix(outer: Location, inner: Location, resolver: B
     if (a.s3().bucket !== b.s3().bucket) return undefined;
   }
   return innerPrefix;
+}
+
+/** Refuses a copy onto a key below `sourcePrefix`, which is another object of the same transfer. */
+export function checkOverwritesSource(destination: Location, sourcePrefix: string | undefined): void {
+  if (sourcePrefix !== undefined && destination.type === "blob" && destination.key.startsWith(sourcePrefix)) {
+    throw new Error(`${formatLocation(destination)} is also a source; the prefixes overlap`);
+  }
 }
 
 export function describe(operation: Operation): string {
@@ -539,7 +553,9 @@ async function deleteAll(operations: Operation[], settings: TransferSettings, su
       }
       summary.remaining--;
     } else {
-      byBucket.set(location.bucket, [...(byBucket.get(location.bucket) ?? []), location.key]);
+      const keys = byBucket.get(location.bucket) ?? [];
+      keys.push(location.key);
+      byBucket.set(location.bucket, keys);
     }
   }
   for (const [name, keys] of byBucket) {

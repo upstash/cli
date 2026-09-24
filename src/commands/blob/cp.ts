@@ -7,6 +7,7 @@ import { BucketResolver } from "./buckets.js";
 import {
   addCommonOptions,
   addObjectOptions,
+  checkOverwritesSource,
   claimLocal,
   destinationFor,
   executePlan,
@@ -125,7 +126,9 @@ Examples:
 
       const recursive = Boolean(options.recursive);
       const filters = filtersOf(options);
-      const skip = recursive ? await nestedPrefix(source, destination, resolver) : undefined;
+      const [skip, sourceInside] = recursive
+        ? await Promise.all([nestedPrefix(source, destination, resolver), nestedPrefix(destination, source, resolver)])
+        : [];
       const entries = (await listSource(source, recursive, resolver)).filter((entry) =>
         isIncluded(entry.rel, filters) && !(skip !== undefined && entry.location.type === "blob" && entry.location.key.startsWith(skip)));
       const into = recursive || (destination.type === "blob"
@@ -140,6 +143,7 @@ Examples:
         try {
           const target = destinationFor(entry, destination, into);
           claimLocal(claimed, target);
+          checkOverwritesSource(target, sourceInside);
           operations.push({
             action: transferAction(source, destination),
             source: entry.location,

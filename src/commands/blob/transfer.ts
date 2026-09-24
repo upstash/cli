@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { setMaxListeners } from "node:events";
 import { createWriteStream } from "node:fs";
 import { mkdir, opendir, realpath, rename, rm, stat, unlink, utimes } from "node:fs/promises";
-import { basename, dirname, join, posix, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
@@ -334,11 +334,11 @@ export function destinationFor(entry: Entry, destination: Location, into: boolea
   }
   if (!into) return destination;
   const root = resolve(destination.path);
-  const target = resolve(root, ...entry.rel.split("/"));
-  if (!target.startsWith(root + sep)) {
+  const rel = relative(root, resolve(root, ...entry.rel.split("/")));
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
     throw new Error(`${JSON.stringify(entry.rel)} would be written outside ${destination.path}`);
   }
-  return { type: "local", path: join(destination.path, relative(root, target)) };
+  return { type: "local", path: join(destination.path, rel) };
 }
 
 /** Where `rel` lands below a local directory, as the directory walk would report it. */
@@ -346,21 +346,22 @@ export function localRel(rel: string): string {
   return posix.normalize(rel).replace(/^\/+/, "");
 }
 
-/** Identifies a local file: macOS and Windows disks ignore case, and macOS also Unicode normalization. */
-export function localFileKey(path: string): string {
+/** macOS and Windows disks ignore case, and macOS also Unicode normalization. */
+export const foldsCase = process.platform === "darwin" || process.platform === "win32";
+
+/** Identifies a local file, folding case and Unicode form where the disk does or where a wrong guess loses data. */
+export function localFileKey(path: string, fold = foldsCase): string {
   const resolved = resolve(path);
-  return process.platform === "darwin" || process.platform === "win32"
-    ? resolved.normalize("NFC").toLowerCase()
-    : resolved;
+  return fold ? resolved.normalize("NFC").toLowerCase() : resolved;
 }
 
 /**
  * Two keys can land on one local file: `a//b` and `a/b`, or `A.txt` and `a.txt` on a
  * case-insensitive disk. Only the first may write it, so an mv cannot delete the other's source.
  */
-export function claimLocal(claimed: Set<string>, destination: Location): void {
+export function claimLocal(claimed: Set<string>, destination: Location, fold = foldsCase): void {
   if (destination.type !== "local") return;
-  const key = localFileKey(destination.path);
+  const key = localFileKey(destination.path, fold);
   if (claimed.has(key)) throw new Error(`another object is also written to ${destination.path}`);
   claimed.add(key);
 }
@@ -506,6 +507,7 @@ async function perform(operation: Operation, settings: TransferSettings): Promis
       path: destination.key,
       size: operation.size,
       contentType: settings.contentType ?? mime.getType(source.path) ?? "application/octet-stream",
+      follow: true,
     }, settings.signal, { cache: settings.cacheControl, metadata: settings.metadata });
     if (operation.move) await unlink(source.path);
     return;

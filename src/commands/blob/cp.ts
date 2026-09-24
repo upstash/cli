@@ -9,6 +9,7 @@ import {
   addObjectOptions,
   checkOverwritesSource,
   claimLocal,
+  foldsCase,
   destinationFor,
   executePlan,
   filtersOf,
@@ -142,7 +143,9 @@ Examples:
         if (destination.type === "local" && entry.rel.endsWith("/")) continue;
         try {
           const target = destinationFor(entry, destination, into);
-          claimLocal(claimed, target);
+          // An mv folds case everywhere: on a case-insensitive Linux mount, two keys writing one
+          // file would otherwise both be deleted.
+          claimLocal(claimed, target, foldsCase || name === "mv");
           checkOverwritesSource(target, sourceInside);
           operations.push({
             action: transferAction(source, destination),

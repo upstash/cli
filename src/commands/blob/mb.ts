@@ -51,9 +51,9 @@ export function registerBlobRb(blob: Command): void {
       let deletedObjects = 0;
       let abortedUploads = 0;
       if (flags.force) {
-        // Opened by the name the deletes below use, so it is looked up once.
-        const bucket = await resolver.open(match.name);
-        const location = { type: "blob" as const, bucket: match.name, key: "" };
+        const bucket = await resolver.open(match.id);
+        // Addressed by id, which the deletes below reuse from the resolver's cache.
+        const location = { type: "blob" as const, bucket: match.id, key: "" };
         const entries = await listBlobs(bucket, location, "", true);
         const summary = await runOperations(
           entries.map((entry) => ({ action: "delete", source: entry.location, size: 0 })),

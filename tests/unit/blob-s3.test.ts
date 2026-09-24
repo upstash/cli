@@ -74,6 +74,10 @@ describe("locations", () => {
     expect(destinationFor(entry("sub/a.txt"), { type: "local", path: "out" }, true)).toEqual({ type: "local", path: join("out", "sub", "a.txt") });
   });
 
+  it("writes into a filesystem root", () => {
+    expect(destinationFor(entry("a/b.txt"), { type: "local", path: "/" }, true)).toEqual({ type: "local", path: join("/", "a", "b.txt") });
+  });
+
   it("refuses keys that would escape the local destination", () => {
     for (const rel of ["../escape.txt", "a/../../escape.txt", ".."]) {
       expect(() => destinationFor(entry(rel), { type: "local", path: directory }, true)).toThrow("outside");
@@ -96,6 +100,7 @@ describe("local collisions", () => {
     if (process.platform === "linux") lower.not.toThrow();
     else lower.toThrow("also written");
     expect(() => claimLocal(claimed, { type: "blob", bucket: "b", key: "README.md" })).not.toThrow();
+    expect(() => claimLocal(claimed, { type: "local", path: join(directory, "Readme.MD") }, true)).toThrow("also written");
   });
 
   it("finds a destination prefix nested in the source within one bucket", async () => {

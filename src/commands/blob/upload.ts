@@ -3,7 +3,7 @@ import type { PutOptions } from "@upstash/blob";
 import { Command, InvalidArgumentError } from "commander";
 import { setMaxListeners } from "node:events";
 import { createReadStream } from "node:fs";
-import { lstat, opendir } from "node:fs/promises";
+import { lstat, opendir, stat } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import mime from "mime";
@@ -17,6 +17,8 @@ export interface UploadFile {
   path: string;
   size: number;
   contentType: string;
+  /** Follow a symbolic link at `source`, as the aws s3 style commands do. */
+  follow?: boolean;
 }
 
 export interface UploadSummary {
@@ -93,7 +95,7 @@ export async function putFile(
 ): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     if (signal?.aborted) throw new Error("upload interrupted");
-    const current = await lstat(file.source);
+    const current = await (file.follow ? stat : lstat)(file.source);
     if (!current.isFile() || current.size !== file.size) {
       throw new Error("source changed since scanning; rerun the command");
     }

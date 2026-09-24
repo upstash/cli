@@ -95,6 +95,7 @@ Examples:
       let unchanged = 0;
       const wanted = new Set<string>();
       const claimed = new Set<string>();
+      const written = new Set<string>();
       for (const entry of sources.filter((entry) => included(entry) && outside(entry, destinationInside))) {
         // Keys like "a//b" land on local "a/b", which is what the local listing reports.
         const rel = destination.type === "local" ? localRel(entry.rel) : entry.rel;
@@ -103,6 +104,7 @@ Examples:
         try {
           const to = target?.location ?? destinationFor(entry, destination, true);
           claimLocal(claimed, to);
+          if (to.type === "local") written.add(localFileKey(to.path, true));
           checkOverwritesSource(to, sourceInside);
           if (target && !needsSync(entry, target, action, options)) {
             unchanged++;
@@ -117,7 +119,8 @@ Examples:
         for (const [rel, entry] of current) {
           if (wanted.has(rel)) continue;
           // On a case-insensitive disk "a.txt" may be the file a source "A.txt" was just written to.
-          if (entry.location.type === "local" && claimed.has(localFileKey(entry.location.path))) continue;
+          // Folded on every OS, since Linux can mount such disks; at worst a stale file stays.
+          if (entry.location.type === "local" && written.has(localFileKey(entry.location.path, true))) continue;
           operations.push({ action: "delete", source: entry.location, size: 0 });
         }
       }

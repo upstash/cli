@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { setMaxListeners } from "node:events";
 import { createWriteStream } from "node:fs";
 import { lstat, mkdir, opendir, rename, rm, stat, unlink, utimes } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, posix, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
@@ -212,14 +212,18 @@ async function walk(root: string): Promise<Entry[]> {
   return entries;
 }
 
-export async function listBlobs(bucket: Bucket, location: BlobLocation, prefix: string): Promise<Entry[]> {
+/**
+ * Every object below `prefix`. Zero-byte "folder" markers ending in "/" are skipped, as aws s3 skips
+ * them everywhere except deletes; `forDelete` keeps them, the marker at the prefix itself included.
+ */
+export async function listBlobs(bucket: Bucket, location: BlobLocation, prefix: string, forDelete = false): Promise<Entry[]> {
   const entries: Entry[] = [];
   let cursor: string | undefined;
   do {
     const page = await bucket.list({ prefix, limit: 1000, cursor });
     for (const blob of page.blobs) {
       const rel = blob.path.slice(prefix.length);
-      if (!rel) continue;
+      if (!forDelete && (!rel || (blob.size === 0 && rel.endsWith("/")))) continue;
       entries.push({
         rel,
         size: blob.size,
@@ -331,6 +335,22 @@ export function destinationFor(entry: Entry, destination: Location, into: boolea
   return { type: "local", path: join(destination.path, relative(root, target)) };
 }
 
+/** Where `rel` lands below a local directory, as the directory walk would report it. */
+export function localRel(rel: string): string {
+  return posix.normalize(rel).replace(/^\/+/, "");
+}
+
+/**
+ * Two keys can land on one local file: `a//b` and `a/b`, or `A.txt` and `a.txt` on a
+ * case-insensitive disk. Only the first may write it, so an mv cannot delete the other's source.
+ */
+export function claimLocal(claimed: Set<string>, destination: Location): void {
+  if (destination.type !== "local") return;
+  const key = resolve(destination.path).toLowerCase();
+  if (claimed.has(key)) throw new Error(`another object is also written to ${destination.path}`);
+  claimed.add(key);
+}
+
 export function describe(operation: Operation): string {
   const verb = operation.move ? "move" : operation.action;
   const source = formatLocation(operation.source);
@@ -385,7 +405,7 @@ async function withRetries<T>(signal: AbortSignal, run: () => Promise<T>): Promi
 async function download(bucket: Bucket, key: string, target: string, signal: AbortSignal): Promise<void> {
   await mkdir(dirname(target), { recursive: true });
   await withRetries(signal, async () => {
-    const temp = join(dirname(target), `.${basename(target)}.${randomUUID().slice(0, 8)}.upstash-tmp`);
+    const temp = join(dirname(target), `.upstash-${randomUUID().slice(0, 8)}.tmp`);
     try {
       const blob = await bucket.get(key);
       await pipeline(

@@ -35,7 +35,7 @@ Examples:
       if (options.recursive) {
         const bucket = await resolver.open(location.bucket);
         const filters = filtersOf(options);
-        const entries = await listBlobs(bucket, location, dirPrefix(location.key));
+        const entries = await listBlobs(bucket, location, dirPrefix(location.key), true);
         operations = entries
           .filter((entry) => isIncluded(entry.rel, filters))
           .map((entry) => ({ action: "delete", source: entry.location, size: 0 }));

@@ -53,7 +53,7 @@ export function registerBlobRb(blob: Command): void {
       if (flags.force) {
         const bucket = await resolver.open(match.id);
         const location = { type: "blob" as const, bucket: match.name, key: "" };
-        const entries = await listBlobs(bucket, location, "");
+        const entries = await listBlobs(bucket, location, "", true);
         const summary = await runOperations(
           entries.map((entry) => ({ action: "delete", source: entry.location, size: 0 })),
           {

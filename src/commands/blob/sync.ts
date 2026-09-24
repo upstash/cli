@@ -1,8 +1,10 @@
 import { Command } from "commander";
+import { resolve } from "node:path";
 import { BucketResolver } from "./buckets.js";
 import {
   addCommonOptions,
   addObjectOptions,
+  claimLocal,
   destinationFor,
   executePlan,
   filtersOf,
@@ -10,6 +12,7 @@ import {
   isIncluded,
   listDestination,
   listSource,
+  localRel,
   parseLocation,
   transferAction,
 } from "./transfer.js";
@@ -82,27 +85,30 @@ Examples:
       const failures: Failure[] = [];
       let unchanged = 0;
       const wanted = new Set<string>();
+      const claimed = new Set<string>();
       for (const entry of sources.filter(included)) {
-        wanted.add(entry.rel);
-        const target = current.get(entry.rel);
-        if (target && !needsSync(entry, target, action, options)) {
-          unchanged++;
-          continue;
-        }
+        // Keys like "a//b" land on local "a/b", which is what the local listing reports.
+        const rel = destination.type === "local" ? localRel(entry.rel) : entry.rel;
+        wanted.add(rel);
+        const target = current.get(rel);
         try {
-          operations.push({
-            action,
-            source: entry.location,
-            destination: target?.location ?? destinationFor(entry, destination, true),
-            size: entry.size,
-          });
+          const to = target?.location ?? destinationFor(entry, destination, true);
+          claimLocal(claimed, to);
+          if (target && !needsSync(entry, target, action, options)) {
+            unchanged++;
+            continue;
+          }
+          operations.push({ action, source: entry.location, destination: to, size: entry.size });
         } catch (error) {
           failures.push({ source: formatLocation(entry.location), error: (error as Error).message });
         }
       }
       if (options.delete) {
         for (const [rel, entry] of current) {
-          if (!wanted.has(rel)) operations.push({ action: "delete", source: entry.location, size: 0 });
+          if (wanted.has(rel)) continue;
+          // On a case-insensitive disk "a.txt" may be the file a source "A.txt" was just written to.
+          if (entry.location.type === "local" && claimed.has(resolve(entry.location.path).toLowerCase())) continue;
+          operations.push({ action: "delete", source: entry.location, size: 0 });
         }
       }
       await executePlan(operations, failures, options, resolver, { unchanged });

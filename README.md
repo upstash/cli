@@ -159,6 +159,8 @@ upstash blob rb blob://new-bucket --force
 Flags follow `aws s3`: `--recursive`, `--exclude`/`--include` (applied in order,
 last match wins), `--dryrun`, `--delete`, `--size-only`, `--exact-timestamps`,
 `--content-type`, `--cache-control`, `--metadata`, `--expected-size` and `--quiet`.
+Copies between buckets reset Cache-Control to the default unless `--cache-control`
+is given.
 Progress goes to stderr and a JSON summary to stdout. Transfers keep going past a
 failed file and exit unsuccessfully at the end.
 

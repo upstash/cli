@@ -7,6 +7,7 @@ import { BucketResolver } from "./buckets.js";
 import {
   addCommonOptions,
   addObjectOptions,
+  claimLocal,
   destinationFor,
   executePlan,
   filtersOf,
@@ -44,13 +45,25 @@ async function copyStream(source: Location, destination: Location, options: Copy
     }
     const bucket = await resolver.open(destination.bucket);
     const body = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-    // Without a declared size the SDK has to buffer the stream to learn its length.
-    const result = await bucket.put(destination.key, body, {
-      contentType: options.contentType ?? "application/octet-stream",
-      cache: options.cacheControl,
-      metadata: options.metadata,
-      ...(options.expectedSize === undefined ? { maxSize: "5gb" } : { size: options.expectedSize }),
-    });
+    // Failing the stream makes the SDK abort a multipart upload instead of leaving it behind.
+    const interrupt = (): void => {
+      process.stdin.destroy(new Error("upload interrupted"));
+    };
+    process.once("SIGINT", interrupt);
+    process.once("SIGTERM", interrupt);
+    let result;
+    try {
+      // Without a declared size the SDK has to buffer the stream to learn its length.
+      result = await bucket.put(destination.key, body, {
+        contentType: options.contentType ?? "application/octet-stream",
+        cache: options.cacheControl,
+        metadata: options.metadata,
+        ...(options.expectedSize === undefined ? { maxSize: "5gb" } : { size: options.expectedSize }),
+      });
+    } finally {
+      process.removeListener("SIGINT", interrupt);
+      process.removeListener("SIGTERM", interrupt);
+    }
     if (!options.quiet) console.error(`upload: - to ${formatLocation(destination)}`);
     printJSON({ completed: 1, bytes: result.size, failed: [], remaining: 0 });
     return;
@@ -88,6 +101,8 @@ existing local directory) keeps the source's file name. ${name === "cp"
       ? `Use - as the source or
 destination to stream stdin or stdout.`
       : "Sources, local files included,\nare deleted after each successful copy."}
+Copies between buckets keep content type and metadata; Cache-Control is reset
+to the default unless --cache-control is given.
 
 Examples:
   upstash blob ${name} ./photo.png blob://my-bucket/images/
@@ -115,14 +130,17 @@ Examples:
         : await isLocalDirectory(destination.path));
       const operations: Operation[] = [];
       const failures: Failure[] = [];
+      const claimed = new Set<string>();
       for (const entry of entries) {
         // Zero-byte "folder" markers have no local file to become.
         if (destination.type === "local" && entry.rel.endsWith("/")) continue;
         try {
+          const target = destinationFor(entry, destination, into);
+          claimLocal(claimed, target);
           operations.push({
             action: transferAction(source, destination),
             source: entry.location,
-            destination: destinationFor(entry, destination, into),
+            destination: target,
             size: entry.size,
             move: name === "mv",
           });

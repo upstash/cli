@@ -7,10 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BucketResolver, tokenBucketId } from "../../src/commands/blob/buckets.js";
 import { needsSync } from "../../src/commands/blob/sync.js";
 import {
+  claimLocal,
   destinationFor,
   dirPrefix,
   globToRegExp,
   isIncluded,
+  listBlobs,
+  localRel,
   parseLocation,
 } from "../../src/commands/blob/transfer.js";
 import type { Entry } from "../../src/commands/blob/transfer.js";
@@ -73,6 +76,40 @@ describe("locations", () => {
     for (const rel of ["../escape.txt", "a/../../escape.txt", ".."]) {
       expect(() => destinationFor(entry(rel), { type: "local", path: directory }, true)).toThrow("outside");
     }
+  });
+});
+
+describe("local collisions", () => {
+  it("normalizes keys the way the local listing reports them", () => {
+    expect(localRel("/a.txt")).toBe("a.txt");
+    expect(localRel("a//b/./c")).toBe("a/b/c");
+    expect(localRel("a/b")).toBe("a/b");
+  });
+
+  it("lets only one key write a local file, ignoring case", () => {
+    const claimed = new Set<string>();
+    claimLocal(claimed, { type: "local", path: join(directory, "README.md") });
+    expect(() => claimLocal(claimed, { type: "local", path: join(directory, "readme.md") })).toThrow("also written");
+    expect(() => claimLocal(claimed, { type: "blob", bucket: "b", key: "README.md" })).not.toThrow();
+  });
+});
+
+describe("folder markers", () => {
+  const listing = {
+    list: async () => ({
+      cursor: undefined,
+      blobs: [
+        { path: "tmp/", size: 0, etag: "", uploadedAt: new Date(0) },
+        { path: "tmp/sub/", size: 0, etag: "", uploadedAt: new Date(0) },
+        { path: "tmp/x.txt", size: 1, etag: "", uploadedAt: new Date(0) },
+      ],
+    }),
+  } as unknown as Parameters<typeof listBlobs>[0];
+  const location = { type: "blob" as const, bucket: "b", key: "tmp" };
+
+  it("skips zero-byte markers except when deleting", async () => {
+    expect((await listBlobs(listing, location, "tmp/")).map((e) => e.rel)).toEqual(["x.txt"]);
+    expect((await listBlobs(listing, location, "tmp/", true)).map((e) => e.rel)).toEqual(["", "sub/", "x.txt"]);
   });
 });
 

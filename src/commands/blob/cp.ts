@@ -16,6 +16,7 @@ import {
   isIncluded,
   isLocalDirectory,
   listSource,
+  nestedPrefix,
   parseLocation,
   transferAction,
 } from "./transfer.js";
@@ -124,7 +125,9 @@ Examples:
 
       const recursive = Boolean(options.recursive);
       const filters = filtersOf(options);
-      const entries = (await listSource(source, recursive, resolver)).filter((entry) => isIncluded(entry.rel, filters));
+      const skip = recursive ? await nestedPrefix(source, destination, resolver) : undefined;
+      const entries = (await listSource(source, recursive, resolver)).filter((entry) =>
+        isIncluded(entry.rel, filters) && !(skip !== undefined && entry.location.type === "blob" && entry.location.key.startsWith(skip)));
       const into = recursive || (destination.type === "blob"
         ? !destination.key || destination.key.endsWith("/")
         : await isLocalDirectory(destination.path));

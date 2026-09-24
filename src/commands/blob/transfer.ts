@@ -340,15 +340,39 @@ export function localRel(rel: string): string {
   return posix.normalize(rel).replace(/^\/+/, "");
 }
 
+/** Identifies a local file: macOS and Windows disks ignore case, and macOS also Unicode normalization. */
+export function localFileKey(path: string): string {
+  const resolved = resolve(path);
+  return process.platform === "darwin" || process.platform === "win32"
+    ? resolved.normalize("NFC").toLowerCase()
+    : resolved;
+}
+
 /**
  * Two keys can land on one local file: `a//b` and `a/b`, or `A.txt` and `a.txt` on a
  * case-insensitive disk. Only the first may write it, so an mv cannot delete the other's source.
  */
 export function claimLocal(claimed: Set<string>, destination: Location): void {
   if (destination.type !== "local") return;
-  const key = resolve(destination.path).toLowerCase();
+  const key = localFileKey(destination.path);
   if (claimed.has(key)) throw new Error(`another object is also written to ${destination.path}`);
   claimed.add(key);
+}
+
+/**
+ * When `inner` is a prefix nested inside `outer` in the same bucket, returns it so the outer
+ * listing can skip those keys: `mv blob://b/ blob://b/archive/` must not move its own output.
+ */
+export async function nestedPrefix(outer: Location, inner: Location, resolver: BucketResolver): Promise<string | undefined> {
+  if (outer.type !== "blob" || inner.type !== "blob") return undefined;
+  const outerPrefix = dirPrefix(outer.key);
+  const innerPrefix = dirPrefix(inner.key);
+  if (innerPrefix === outerPrefix || !innerPrefix.startsWith(outerPrefix)) return undefined;
+  if (outer.bucket !== inner.bucket) {
+    const [a, b] = await Promise.all([resolver.open(outer.bucket), resolver.open(inner.bucket)]);
+    if (a.s3().bucket !== b.s3().bucket) return undefined;
+  }
+  return innerPrefix;
 }
 
 export function describe(operation: Operation): string {
@@ -380,9 +404,10 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function checkKey(key: string): void {
+/** Uploads also refuse control characters and backslashes, which local names should not carry into keys. */
+function checkKey(key: string, upload: boolean): void {
   if (!key) throw new Error("destination key is empty");
-  if (Buffer.byteLength(key) > 1024 || /[\x00-\x1f\x7f\\]/.test(key) ||
+  if (Buffer.byteLength(key) > 1024 || (upload && /[\x00-\x1f\x7f\\]/.test(key)) ||
     key.split("/").some((part) => part === "." || part === "..")) {
     throw new Error(`unsupported object key: ${JSON.stringify(key)}`);
   }
@@ -460,7 +485,7 @@ async function copyObject(
 async function perform(operation: Operation, settings: TransferSettings): Promise<void> {
   const { source, destination } = operation;
   if (operation.action === "upload" && source.type === "local" && destination?.type === "blob") {
-    checkKey(destination.key);
+    checkKey(destination.key, true);
     const bucket = await settings.resolver.open(destination.bucket);
     await putFile(bucket, {
       source: source.path,
@@ -478,7 +503,7 @@ async function perform(operation: Operation, settings: TransferSettings): Promis
     return;
   }
   if (operation.action === "copy" && source.type === "blob" && destination?.type === "blob") {
-    checkKey(destination.key);
+    checkKey(destination.key, false);
     const from = await settings.resolver.open(source.bucket);
     const to = await settings.resolver.open(destination.bucket);
     if (from.s3().bucket === to.s3().bucket && source.key === destination.key) {
@@ -613,6 +638,7 @@ export async function executePlan(
       ...extra,
       ...(failures.length > 0 && { skipped: failures }),
     });
+    if (failures.length > 0) throw new Error(`${failures.length} entries would be skipped; see the JSON output`);
     return;
   }
 

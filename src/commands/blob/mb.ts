@@ -51,7 +51,8 @@ export function registerBlobRb(blob: Command): void {
       let deletedObjects = 0;
       let abortedUploads = 0;
       if (flags.force) {
-        const bucket = await resolver.open(match.id);
+        // Opened by the name the deletes below use, so it is looked up once.
+        const bucket = await resolver.open(match.name);
         const location = { type: "blob" as const, bucket: match.name, key: "" };
         const entries = await listBlobs(bucket, location, "", true);
         const summary = await runOperations(

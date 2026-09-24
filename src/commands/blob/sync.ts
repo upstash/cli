@@ -1,5 +1,4 @@
 import { Command } from "commander";
-import { resolve } from "node:path";
 import { BucketResolver } from "./buckets.js";
 import {
   addCommonOptions,
@@ -12,7 +11,9 @@ import {
   isIncluded,
   listDestination,
   listSource,
+  localFileKey,
   localRel,
+  nestedPrefix,
   parseLocation,
   transferAction,
 } from "./transfer.js";
@@ -73,20 +74,26 @@ Examples:
       const resolver = new BucketResolver(cmd, options.token);
       const filters = filtersOf(options);
       const action = transferAction(source, destination);
-      const [sources, existing] = await Promise.all([
+      const [sources, existing, destinationInside, sourceInside] = await Promise.all([
         listSource(source, true, resolver),
         listDestination(destination, resolver),
+        nestedPrefix(source, destination, resolver),
+        nestedPrefix(destination, source, resolver),
       ]);
+      const outside = (entry: Entry, prefix: string | undefined): boolean =>
+        prefix === undefined || entry.location.type !== "blob" || !entry.location.key.startsWith(prefix);
       const included = (entry: Entry): boolean =>
         isIncluded(entry.rel, filters) && !(destination.type === "local" && entry.rel.endsWith("/"));
-      const current = new Map(existing.filter(included).map((entry) => [entry.rel, entry]));
+      // With nested prefixes in one bucket, neither side's listing includes the other side's keys.
+      const current = new Map(existing.filter((entry) => included(entry) && outside(entry, sourceInside))
+        .map((entry) => [entry.rel, entry]));
 
       const operations: Operation[] = [];
       const failures: Failure[] = [];
       let unchanged = 0;
       const wanted = new Set<string>();
       const claimed = new Set<string>();
-      for (const entry of sources.filter(included)) {
+      for (const entry of sources.filter((entry) => included(entry) && outside(entry, destinationInside))) {
         // Keys like "a//b" land on local "a/b", which is what the local listing reports.
         const rel = destination.type === "local" ? localRel(entry.rel) : entry.rel;
         wanted.add(rel);
@@ -107,7 +114,7 @@ Examples:
         for (const [rel, entry] of current) {
           if (wanted.has(rel)) continue;
           // On a case-insensitive disk "a.txt" may be the file a source "A.txt" was just written to.
-          if (entry.location.type === "local" && claimed.has(resolve(entry.location.path).toLowerCase())) continue;
+          if (entry.location.type === "local" && claimed.has(localFileKey(entry.location.path))) continue;
           operations.push({ action: "delete", source: entry.location, size: 0 });
         }
       }

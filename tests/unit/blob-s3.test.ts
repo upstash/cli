@@ -14,6 +14,7 @@ import {
   isIncluded,
   listBlobs,
   localRel,
+  nestedPrefix,
   parseLocation,
 } from "../../src/commands/blob/transfer.js";
 import type { Entry } from "../../src/commands/blob/transfer.js";
@@ -86,11 +87,25 @@ describe("local collisions", () => {
     expect(localRel("a/b")).toBe("a/b");
   });
 
-  it("lets only one key write a local file, ignoring case", () => {
+  it("lets only one key write a local file, ignoring case where the disk does", () => {
     const claimed = new Set<string>();
     claimLocal(claimed, { type: "local", path: join(directory, "README.md") });
-    expect(() => claimLocal(claimed, { type: "local", path: join(directory, "readme.md") })).toThrow("also written");
+    expect(() => claimLocal(claimed, { type: "local", path: join(directory, "sub", "..", "README.md") })).toThrow("also written");
+    const lower = expect(() => claimLocal(claimed, { type: "local", path: join(directory, "readme.md") }));
+    if (process.platform === "linux") lower.not.toThrow();
+    else lower.toThrow("also written");
     expect(() => claimLocal(claimed, { type: "blob", bucket: "b", key: "README.md" })).not.toThrow();
+  });
+
+  it("finds a destination prefix nested in the source within one bucket", async () => {
+    const resolver = new BucketResolver(new Command());
+    const at = (key: string) => ({ type: "blob" as const, bucket: "b", key });
+    await expect(nestedPrefix(at(""), at("archive"), resolver)).resolves.toBe("archive/");
+    await expect(nestedPrefix(at("a/"), at("a/b/"), resolver)).resolves.toBe("a/b/");
+    await expect(nestedPrefix(at("archive"), at(""), resolver)).resolves.toBeUndefined();
+    await expect(nestedPrefix(at("a"), at("a"), resolver)).resolves.toBeUndefined();
+    await expect(nestedPrefix(at("a"), at("ab"), resolver)).resolves.toBeUndefined();
+    await expect(nestedPrefix({ type: "local", path: "." }, at("x"), resolver)).resolves.toBeUndefined();
   });
 });
 

@@ -1,4 +1,5 @@
 import { BlobError, Bucket } from "@upstash/blob";
+import type { PutOptions } from "@upstash/blob";
 import { Command, InvalidArgumentError } from "commander";
 import { setMaxListeners } from "node:events";
 import { createReadStream } from "node:fs";
@@ -36,7 +37,7 @@ interface UploadOptions {
   quiet?: boolean;
 }
 
-function concurrency(value: string): number {
+export function concurrency(value: string): number {
   const number = Number(value);
   if (!Number.isInteger(number) || number < 1 || number > 16) {
     throw new InvalidArgumentError("concurrency must be an integer from 1 to 16");
@@ -75,12 +76,45 @@ export async function planUpload(source: string, prefix: string): Promise<Upload
   return files;
 }
 
-function retryable(error: unknown): boolean {
+export function retryable(error: unknown): boolean {
   return BlobError.is(error) && (
     error.code === "rate_limited" || error.code === "not_ready" ||
     (error.status !== undefined && error.status >= 500)
   ) || error instanceof TypeError && (error.message === "fetch failed" || error.message === "terminated") ||
     error instanceof Error && error.name === "TimeoutError";
+}
+
+/** Streams one local file to the bucket, retrying transient failures from the start of the file. */
+export async function putFile(
+  bucket: Pick<Bucket, "put">,
+  file: UploadFile,
+  signal?: AbortSignal,
+  options: Pick<PutOptions, "cache" | "metadata"> = {},
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    if (signal?.aborted) throw new Error("upload interrupted");
+    const current = await lstat(file.source);
+    if (!current.isFile() || current.size !== file.size) {
+      throw new Error("source changed since scanning; rerun the command");
+    }
+    const stream = createReadStream(file.source, { signal, highWaterMark: 64 * 1024 });
+    try {
+      const body = Readable.toWeb(stream, {
+        strategy: { highWaterMark: 64 * 1024, size: (chunk: Buffer) => chunk.byteLength },
+      }) as ReadableStream<Uint8Array>;
+      await bucket.put(file.path, body, {
+        ...options,
+        size: file.size,
+        contentType: file.contentType,
+      });
+      return;
+    } catch (error) {
+      if (attempt >= 2 || signal?.aborted || !retryable(error)) throw error;
+    } finally {
+      stream.destroy();
+    }
+    await sleep(500 * 2 ** attempt);
+  }
 }
 
 export async function uploadFiles(
@@ -102,29 +136,7 @@ export async function uploadFiles(
           progress(`Skipped ${JSON.stringify(file.path)}`);
         } else {
           progress(`Uploading ${JSON.stringify(file.path)} (${file.size} bytes)`);
-          for (let attempt = 0; ; attempt++) {
-            if (signal?.aborted) throw new Error("upload interrupted");
-            const current = await lstat(file.source);
-            if (!current.isFile() || current.size !== file.size) {
-              throw new Error("source changed since scanning; rerun the command");
-            }
-            const stream = createReadStream(file.source, { signal, highWaterMark: 64 * 1024 });
-            try {
-              const body = Readable.toWeb(stream, {
-                strategy: { highWaterMark: 64 * 1024, size: (chunk: Buffer) => chunk.byteLength },
-              }) as ReadableStream<Uint8Array>;
-              await bucket.put(file.path, body, {
-                size: file.size,
-                contentType: file.contentType,
-              });
-              break;
-            } catch (error) {
-              if (attempt >= 2 || signal?.aborted || !retryable(error)) throw error;
-            } finally {
-              stream.destroy();
-            }
-            await sleep(500 * 2 ** attempt);
-          }
+          await putFile(bucket, file, signal);
           summary.uploaded++;
           summary.bytes += file.size;
           progress(`Uploaded ${JSON.stringify(file.path)}`);

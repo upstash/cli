@@ -73,6 +73,7 @@ upstash blob create --name my-bucket --visibility private
 upstash blob list
 upstash blob credentials --bucket-id $BUCKET_ID
 upstash blob upload ./assets --bucket-id $BUCKET_ID --prefix assets
+upstash blob sync ./site blob://my-bucket/site --delete
 
 # Team
 upstash team list
@@ -135,6 +136,37 @@ stops scheduling work and closes local streams; in-flight requests may take time
 to settle. Completed objects remain in the bucket. A process kill, or a network
 failure that also blocks cleanup, may leave an incomplete multipart upload. It does
 not expire on its own; remove it with the Blob SDK's `abortStaleMultipartUploads`.
+
+## Working with Blob objects like `aws s3`
+
+`upstash blob` has the `aws s3` commands, with `blob://<bucket>/<key>` in place of
+`s3://`. `<bucket>` is a bucket name or id.
+
+```bash
+upstash blob ls                                        # buckets
+upstash blob ls blob://my-bucket/images/               # one level; --recursive for all
+upstash blob cp ./photo.png blob://my-bucket/images/
+upstash blob cp blob://my-bucket/images ./images --recursive --exclude "*.tmp"
+upstash blob cp blob://my-bucket/config.json - | jq .
+upstash blob mv blob://my-bucket/a.txt blob://other-bucket/a.txt
+upstash blob sync ./site blob://my-bucket/site --delete
+upstash blob rm blob://my-bucket/tmp --recursive --dryrun
+upstash blob presign blob://my-bucket/report.pdf --expires-in 3600
+upstash blob mb blob://new-bucket
+upstash blob rb blob://new-bucket --force
+```
+
+Flags follow `aws s3`: `--recursive`, `--exclude`/`--include` (applied in order,
+last match wins), `--dryrun`, `--delete`, `--size-only`, `--exact-timestamps`,
+`--content-type`, `--cache-control`, `--metadata`, `--expected-size` and `--quiet`.
+Copies between buckets reset Cache-Control to the default unless `--cache-control`
+is given.
+Progress goes to stderr and a JSON summary to stdout. Transfers keep going past a
+failed file and exit unsuccessfully at the end.
+
+Bucket names need an Upstash login. A Blob token (`--token` or `UPSTASH_BLOB_TOKEN`)
+works without one, but only for its own bucket, addressed by id:
+`blob://<bucket-id>/...`. A token is never used for a bucket it wasn't issued for.
 
 ## Telemetry
 

@@ -57,7 +57,7 @@ describe("blob command registration", () => {
     const blob = program.commands.find((command) => command.name() === "blob");
 
     expect(blob).toBeDefined();
-    expect(blob?.description()).toBe("Manage Blob buckets");
+    expect(blob?.description()).toBe("Manage Blob buckets and objects");
     expect(blob?.commands.map((command) => command.name())).toEqual([
       "create",
       "list",
@@ -65,6 +65,14 @@ describe("blob command registration", () => {
       "delete",
       "credentials",
       "upload",
+      "ls",
+      "cp",
+      "mv",
+      "rm",
+      "sync",
+      "presign",
+      "mb",
+      "rb",
     ]);
   });
 });

@@ -5,7 +5,7 @@ import { printJSON } from "../../output.js";
 import { BLOB_VISIBILITIES } from "../../types.js";
 import type { BlobBucket, BlobVisibility } from "../../types.js";
 
-function parseVisibility(value: string): BlobVisibility {
+export function parseVisibility(value: string): BlobVisibility {
   if ((BLOB_VISIBILITIES as readonly string[]).includes(value)) {
     return value as BlobVisibility;
   }

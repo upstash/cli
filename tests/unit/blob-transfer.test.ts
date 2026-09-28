@@ -60,6 +60,7 @@ describe("bucket paths", () => {
     expect(parseBlobLocation("my-bucket/a/b.txt")).toEqual({ type: "blob", bucket: "my-bucket", key: "a/b.txt" });
     expect(parseBlobLocation("my-bucket")).toEqual({ type: "blob", bucket: "my-bucket", key: "" });
     expect(parseBlobLocation("blob://my-bucket/a")).toEqual({ type: "blob", bucket: "my-bucket", key: "a" });
+    expect(parseBlobLocation("my-bucket/a://b")).toEqual({ type: "blob", bucket: "my-bucket", key: "a://b" });
     expect(() => parseBlobLocation("s3://my-bucket/a")).toThrow("unsupported location");
     expect(() => parseBlobLocation("/a")).toThrow("has no bucket");
     expect(parseBucket("my-bucket/")).toBe("my-bucket");

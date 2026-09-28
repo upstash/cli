@@ -21,6 +21,8 @@ export type Location =
 
 export type BlobLocation = Extract<Location, { type: "blob" }>;
 
+const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
+
 export function parseLocation(value: string): Location {
   if (value.startsWith("blob://")) {
     const rest = value.slice("blob://".length);
@@ -29,7 +31,7 @@ export function parseLocation(value: string): Location {
     if (!bucket) throw new Error(`"${value}" has no bucket: use blob://<bucket>/<key>`);
     return { type: "blob", bucket, key: slash === -1 ? "" : rest.slice(slash + 1) };
   }
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+  if (hasScheme(value)) {
     throw new Error(`unsupported location "${value}": use blob://<bucket>/<key> or a local path`);
   }
   return { type: "local", path: value };
@@ -37,7 +39,7 @@ export function parseLocation(value: string): Location {
 
 /** For arguments that can only be in a bucket, where `my-bucket/key` means `blob://my-bucket/key`. */
 export function parseBlobLocation(value: string): BlobLocation {
-  const location = parseLocation(value.includes("://") ? value : `blob://${value}`);
+  const location = parseLocation(hasScheme(value) ? value : `blob://${value}`);
   if (location.type !== "blob") throw new Error(`"${value}" is not a blob://<bucket>/<key> URI`);
   return location;
 }

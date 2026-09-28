@@ -33,6 +33,10 @@ Examples:
       const resolver = new BucketResolver(cmd, options.token);
       let operations: Operation[];
       if (options.recursive) {
+        // A bare `rm -r build` is too easily meant as a local folder to empty a whole bucket.
+        if (!location.key && !uri.startsWith("blob://")) {
+          throw new Error(`to delete every object in ${location.bucket}, write blob://${location.bucket}, or remove the bucket with rb -f`);
+        }
         const bucket = await resolver.open(location.bucket);
         const filters = filtersOf(options);
         const entries = await listBlobs(bucket, location, dirPrefix(location.key), true);

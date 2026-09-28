@@ -1,9 +1,11 @@
 import { Bucket, BlobError } from "@upstash/blob";
+import { Command } from "commander";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BucketResolver } from "../../src/commands/blob/buckets.js";
 import { parseBlobLocation, parseBucket, putFile } from "../../src/commands/blob/transfer.js";
 import { createBlobProgram, runCommand } from "../helpers/program.js";
 
@@ -74,6 +76,13 @@ describe("bucket paths", () => {
     expect(flags("sync")).toEqual(expect.arrayContaining(["-d", "-n", "-q"]));
     expect(flags("rm")).toEqual(expect.arrayContaining(["-r", "-n", "-q"]));
     expect(flags("rb")).toEqual(expect.arrayContaining(["-f", "-q"]));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("checks arguments before any request", async () => {
+    await expect(runCommand(await createBlobProgram(), ["blob", "cp", directory, "blob://bucket/x", "-r", "--concurrency", "0"]))
+      .rejects.toThrow("1 to 16");
+    await expect(runCommand(await createBlobProgram(), ["blob", "rm", "build", "-r"])).rejects.toThrow("write blob://build");
     expect(fetch).not.toHaveBeenCalled();
   });
 });
@@ -217,7 +226,8 @@ describe("cp with the real SDK and offline storage", () => {
     const id = randomUUID();
     process.env.UPSTASH_BLOB_TOKEN = token(id);
     await expect(runCommand(await createBlobProgram(), ["blob", "cp", join(directory, "hello.txt"), `blob://${id}/`, "--token", " "]))
-      .rejects.toThrow();
+      .rejects.toThrow("1 of 1 operations failed");
+    await expect(new BucketResolver(new Command(), " ").open(id)).rejects.toThrow("--token must be a non-empty");
     expect(fetch).not.toHaveBeenCalled();
   });
 });

@@ -70,10 +70,11 @@ upstash qstash stats --qstash-id $QSTASH_ID --period 7d
 
 # Blob
 upstash blob create --name my-bucket --visibility private
-upstash blob list
-upstash blob credentials --bucket-id $BUCKET_ID
-upstash blob upload ./assets --bucket-id $BUCKET_ID --prefix assets
-upstash blob sync ./site blob://my-bucket/site --delete
+upstash blob ls
+upstash blob ls my-bucket
+upstash blob cp ./assets blob://my-bucket/assets -r
+upstash blob sync ./site blob://my-bucket/site -d
+upstash blob credentials my-bucket
 
 # Team
 upstash team list
@@ -82,91 +83,59 @@ upstash team add-member --team-id $TEAM_ID --member-email you@example.com --role
 
 Run `upstash --help` (or `--help` on any subcommand) to discover everything else, and check the [full docs](https://upstash.com/docs/agent-resources/cli) for the complete catalog. `upstash blob credentials` returns temporary S3 credentials for use with AWS CLI, rclone, or an S3 SDK.
 
-## Uploading Blob files and folders
+## Working with Blob buckets and objects
 
-Set `UPSTASH_BLOB_TOKEN` in your environment or `.env` file, then run:
-
-```bash
-upstash blob upload ./assets --prefix assets
-```
-
-No Upstash login, account email, or management API key is required when using a
-bucket token. You can also provide the token explicitly or select another env file:
-
-```bash
-upstash blob upload ./assets --token "$BLOB_TOKEN" --prefix assets
-upstash --env-path ./uploads.env blob upload ./assets --prefix assets
-upstash blob credentials --token "$BLOB_TOKEN"
-```
-
-`--token` overrides `UPSTASH_BLOB_TOKEN`. Exported environment variables take
-precedence over values loaded from `.env` or `--env-path`. Use the Blob bucket
-token, not temporary S3 credentials, so the CLI can refresh credentials throughout
-the transfer.
-
-Alternatively, use `--bucket-id $BUCKET_ID` with your saved Upstash login or
-Developer API credentials. An explicit bucket ID overrides the ambient token;
-`--token` and `--bucket-id` cannot be combined. AWS CLI and manually exported S3
-credentials are not needed. A directory uploads its contents recursively: `./assets/images/logo.png`
-becomes `assets/images/logo.png` with the prefix above, or `images/logo.png` without
-a prefix. A single file uploads under its filename. Content types are inferred
-from filenames, falling back to `application/octet-stream`.
-
-The Blob SDK streams files, uses multipart for large files, and refreshes temporary
-credentials throughout the upload, including between parts of one large file.
-Transient failures are retried. Four files upload concurrently by default; use
-`--concurrency 1` to reduce memory usage. Progress goes to stderr and the final JSON
-summary goes to stdout. `--quiet` suppresses progress.
-
-```bash
-upstash blob upload ./assets --prefix assets --dry-run
-upstash blob upload ./assets --prefix assets --skip-existing
-```
-
-`--dry-run` lists local files and destination paths without authenticating or
-making network requests. By default existing keys are overwritten. `--skip-existing`
-skips any existing key **without comparing size or contents**; use it to rerun an
-interrupted upload only when the already uploaded objects are the versions you want.
-An incomplete individual file starts again on rerun. Files are not deleted from the
-bucket. Symlinks and empty directories are skipped.
-
-On a failed file, the command stops scheduling more files, waits for active uploads,
-prints a summary with failed and remaining files, and exits unsuccessfully. Ctrl+C
-stops scheduling work and closes local streams; in-flight requests may take time
-to settle. Completed objects remain in the bucket. A process kill, or a network
-failure that also blocks cleanup, may leave an incomplete multipart upload. It does
-not expire on its own; remove it with the Blob SDK's `abortStaleMultipartUploads`.
-
-## Working with Blob objects like `aws s3`
-
-`upstash blob` has the `aws s3` commands, with `blob://<bucket>/<key>` in place of
+The object commands mirror `aws s3`, with `blob://<bucket>/<key>` in place of
 `s3://`. `<bucket>` is a bucket name or id.
 
 ```bash
-upstash blob ls                                        # buckets
-upstash blob ls blob://my-bucket/images/               # one level; --recursive for all
+upstash blob ls                                         # buckets
+upstash blob ls my-bucket/images/                       # one level; -r for all
 upstash blob cp ./photo.png blob://my-bucket/images/
-upstash blob cp blob://my-bucket/images ./images --recursive --exclude "*.tmp"
+upstash blob cp ./assets blob://my-bucket/assets -r
+upstash blob cp blob://my-bucket/images ./images -r --exclude "*.tmp"
 upstash blob cp blob://my-bucket/config.json - | jq .
 upstash blob mv blob://my-bucket/a.txt blob://other-bucket/a.txt
-upstash blob sync ./site blob://my-bucket/site --delete
-upstash blob rm blob://my-bucket/tmp --recursive --dryrun
-upstash blob presign blob://my-bucket/report.pdf --expires-in 600
+upstash blob sync ./site blob://my-bucket/site -d
+upstash blob rm my-bucket/tmp -r -n
+upstash blob presign my-bucket/report.pdf --expires-in 600
 upstash blob mb blob://new-bucket
-upstash blob rb blob://new-bucket --force
+upstash blob rb new-bucket -f
 ```
 
-Flags follow `aws s3`: `--recursive`, `--exclude`/`--include` (applied in order,
-last match wins), `--dryrun`, `--delete`, `--size-only`, `--exact-timestamps`,
-`--content-type`, `--cache-control`, `--metadata`, `--expected-size` and `--quiet`.
-Copies between buckets reset Cache-Control to the default unless `--cache-control`
-is given.
-Progress goes to stderr and a JSON summary to stdout. Transfers keep going past a
-failed file and exit unsuccessfully at the end.
+`cp`, `mv` and `sync` need `blob://` to tell bucket paths from local ones. The
+commands that only take bucket paths (`ls`, `rm`, `presign`, `mb`, `rb`) accept
+`my-bucket/key` without it, as do `get`, `delete` and `credentials`, which take a
+bucket name or id.
 
-Bucket names need an Upstash login. A Blob token (`--token` or `UPSTASH_BLOB_TOKEN`)
-works without one, but only for its own bucket, addressed by id:
-`blob://<bucket-id>/...`. A token is never used for a bucket it wasn't issued for.
+Flags follow `aws s3`: `-r/--recursive`, `--exclude`/`--include` (applied in
+order, last match wins), `-n/--dryrun`, `-d/--delete`, `--size-only`,
+`--exact-timestamps`, `--content-type`, `--cache-control`, `--metadata`,
+`--expected-size`, `--concurrency` and `-q/--quiet`. Copies between buckets reset
+Cache-Control to the default unless `--cache-control` is given. Local symbolic
+links are followed.
+
+Progress goes to stderr and a JSON summary to stdout. Transfers retry transient
+failures, keep going past a failed file, and exit unsuccessfully at the end. Large
+files use multipart uploads, and the Blob SDK refreshes temporary S3 credentials
+throughout, even between parts of one file.
+
+### Using a bucket token instead of a login
+
+Bucket names need an Upstash login. A Blob bucket token (`--token`, or
+`UPSTASH_BLOB_TOKEN` in the environment or `.env`) works without one, but only for
+its own bucket, addressed by id. A token is never used for a bucket it wasn't
+issued for.
+
+```bash
+upstash blob cp ./assets blob://$BUCKET_ID/assets -r --token "$BLOB_TOKEN"
+upstash --env-path ./uploads.env blob sync ./assets blob://$BUCKET_ID/assets
+upstash blob credentials --token "$BLOB_TOKEN"
+```
+
+`--token` and `UPSTASH_BLOB_TOKEN` are each used only for their own bucket, so they
+can point at different buckets. Exported environment variables take precedence
+over values loaded from `.env` or `--env-path`.
 
 ## Telemetry
 

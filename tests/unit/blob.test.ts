@@ -60,11 +60,9 @@ describe("blob command registration", () => {
     expect(blob?.description()).toBe("Manage Blob buckets and objects");
     expect(blob?.commands.map((command) => command.name())).toEqual([
       "create",
-      "list",
       "get",
       "delete",
       "credentials",
-      "upload",
       "ls",
       "cp",
       "mv",
@@ -213,6 +211,60 @@ describe("blob CRUD commands", () => {
   });
 });
 
+describe("bucket arguments", () => {
+  const listed = (): Response => new Response(JSON.stringify([
+    makeBucket({ id: "bucket_other", name: "other", token: undefined, token_next: undefined }),
+    makeBucket({ token: undefined, token_next: undefined }),
+  ]), { status: 200 });
+
+  it("ls lists buckets, and list is the same command", async () => {
+    const buckets = [makeBucket({ token: undefined, token_next: undefined })];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify(buckets), { status: 200 }));
+    expect(await runCommand(await createBlobProgram(), ["blob", "ls"])).toEqual(buckets);
+    expect(await runCommand(await createBlobProgram(), ["blob", "list"])).toEqual(buckets);
+  });
+
+  it.each([["my-bucket"], ["blob://my-bucket"], ["bucket_123"], ["my-bucket/"]])("get %s looks the bucket up by name or id", async (name) => {
+    const bucket = makeBucket();
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(listed())
+      .mockResolvedValueOnce(new Response(JSON.stringify(bucket), { status: 200 }));
+    expect(await runCommand(await createBlobProgram(), ["blob", "get", name])).toEqual(bucket);
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe("https://api.upstash.com/v2/blob/bucket/bucket_123");
+  });
+
+  it("delete by name deletes that bucket's id", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(listed())
+      .mockResolvedValueOnce(new Response('"OK"', { status: 200 }));
+    expect(await runCommand(await createBlobProgram(), ["blob", "delete", "my-bucket"])).toEqual({ deleted: true, bucket_id: "bucket_123" });
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe("https://api.upstash.com/v2/blob/bucket/bucket_123");
+    expect((fetchSpy.mock.calls[1]?.[1] as RequestInit).method).toBe("DELETE");
+  });
+
+  it("credentials by name exchanges that bucket's token", async () => {
+    const credentials = makeCredentials();
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(listed())
+      .mockResolvedValueOnce(new Response(JSON.stringify(makeBucket({ token: "bucket-token" })), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(credentials), { status: 200 }));
+    expect(await runCommand(await createBlobProgram(), ["blob", "credentials", "my-bucket"])).toEqual(credentials);
+    expect((fetchSpy.mock.calls[2]?.[1] as RequestInit).headers).toEqual({ Authorization: "Bearer bucket-token" });
+  });
+
+  it("rejects a missing, unknown, doubled or keyed bucket", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => listed());
+    await expect(runCommand(await createBlobProgram(), ["blob", "get"])).rejects.toThrow("Name a bucket: upstash blob get <name-or-id>");
+    await expect(runCommand(await createBlobProgram(), ["blob", "delete", "nope"])).rejects.toThrow('Blob bucket "nope" not found');
+    await expect(runCommand(await createBlobProgram(), ["blob", "get", "a", "--bucket-id", "b"])).rejects.toThrow("Name the bucket once");
+    await expect(runCommand(await createBlobProgram(), ["blob", "delete", "my-bucket/key"])).rejects.toThrow("includes a key");
+    fetchSpy.mockClear();
+    await expect(runCommand(await createBlobProgram(), ["blob", "credentials", "my-bucket", "--token", "t"]))
+      .rejects.toThrow("Use either --token or a bucket");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("blob credentials command", () => {
   it("by bucket id fetches the bucket first, then exchanges its token", async () => {
     const bucket = makeBucket({ id: "bucket_456", token: "bucket-token" });
@@ -285,7 +337,7 @@ describe("blob credentials command", () => {
     const program = await createBlobProgram();
 
     await expect(runCommand(program, ["blob", "credentials"]))
-      .rejects.toThrow(/--token.*UPSTASH_BLOB_TOKEN.*--bucket-id/);
+      .rejects.toThrow(/Name a bucket.*--token.*UPSTASH_BLOB_TOKEN/);
   });
 
   it("prints successful credential responses unchanged", async () => {

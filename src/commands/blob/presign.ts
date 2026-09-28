@@ -16,7 +16,7 @@ function expiresIn(value: string): number {
 
 export function registerBlobPresign(blob: Command): void {
   blob
-    .command("presign <uri>")
+    .command("presign <path>")
     .description("Create a temporary download URL for an object, like aws s3 presign")
     .option("--expires-in <seconds>", `How long the URL should work, at most ${MAX_EXPIRES_IN}`, expiresIn, MAX_EXPIRES_IN)
     .option("--token <token>", "Blob bucket token, used for the bucket it was issued for (default: UPSTASH_BLOB_TOKEN)")

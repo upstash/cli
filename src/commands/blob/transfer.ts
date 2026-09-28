@@ -1,10 +1,10 @@
 import { BlobError } from "@upstash/blob";
-import type { Bucket } from "@upstash/blob";
+import type { Bucket, PutOptions } from "@upstash/blob";
 import { InvalidArgumentError, Option } from "commander";
 import type { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { setMaxListeners } from "node:events";
-import { createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, opendir, realpath, rename, rm, stat, unlink, utimes } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
@@ -14,13 +14,14 @@ import mime from "mime";
 import { printJSON } from "../../output.js";
 import type { BucketResolver } from "./buckets.js";
 import { sleep } from "./retry.js";
-import { concurrency, putFile, retryable } from "./upload.js";
 
 export type Location =
   | { type: "local"; path: string }
   | { type: "blob"; bucket: string; key: string };
 
 export type BlobLocation = Extract<Location, { type: "blob" }>;
+
+const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
 
 export function parseLocation(value: string): Location {
   if (value.startsWith("blob://")) {
@@ -30,16 +31,24 @@ export function parseLocation(value: string): Location {
     if (!bucket) throw new Error(`"${value}" has no bucket: use blob://<bucket>/<key>`);
     return { type: "blob", bucket, key: slash === -1 ? "" : rest.slice(slash + 1) };
   }
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+  if (hasScheme(value)) {
     throw new Error(`unsupported location "${value}": use blob://<bucket>/<key> or a local path`);
   }
   return { type: "local", path: value };
 }
 
+/** For arguments that can only be in a bucket, where `my-bucket/key` means `blob://my-bucket/key`. */
 export function parseBlobLocation(value: string): BlobLocation {
-  const location = parseLocation(value);
+  const location = parseLocation(hasScheme(value) ? value : `blob://${value}`);
   if (location.type !== "blob") throw new Error(`"${value}" is not a blob://<bucket>/<key> URI`);
   return location;
+}
+
+/** A whole bucket: `my-bucket`, or `blob://my-bucket`, by name or id. */
+export function parseBucket(value: string): string {
+  const location = parseBlobLocation(value);
+  if (location.key.replace(/\/+$/, "")) throw new Error(`${formatLocation(location)} includes a key; name only the bucket`);
+  return location.bucket;
 }
 
 export function formatLocation(location: Location): string {
@@ -114,6 +123,14 @@ export function isIncluded(path: string, filters: Filter[]): boolean {
 
 // ── Options ─────────────────────────────────────────────────────────────────
 
+function concurrency(value: string): number {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1 || number > 16) {
+    throw new InvalidArgumentError("concurrency must be an integer from 1 to 16");
+  }
+  return number;
+}
+
 function parseMetadata(value: string): Record<string, string> {
   const text = value.trim();
   if (text.startsWith("{")) {
@@ -158,9 +175,9 @@ export function addCommonOptions(command: Command): Command {
   return command
     .option("--exclude <pattern>", "Skip paths matching this pattern; repeatable, the last matching filter wins", collectFilter(true))
     .option("--include <pattern>", "Keep paths matching this pattern even if an earlier --exclude matched", collectFilter(false))
-    .option("--dryrun", "Show what would happen without changing anything")
+    .option("-n, --dryrun", "Show what would happen without changing anything")
     .addOption(new Option("--dry-run").hideHelp())
-    .option("--quiet", "Suppress progress on stderr; still print the JSON summary")
+    .option("-q, --quiet", "Suppress progress on stderr; still print the JSON summary")
     .option("--concurrency <count>", "Number of concurrent transfers (1-16)", concurrency, 4)
     .option("--token <token>", "Blob bucket token, used for the bucket it was issued for (default: UPSTASH_BLOB_TOKEN)");
 }
@@ -355,13 +372,25 @@ export function localFileKey(path: string, fold = foldsCase): string {
   return fold ? resolved.normalize("NFC").toLowerCase() : resolved;
 }
 
+/** The path with symbolic links resolved as far as it exists, so aliases of one file compare equal. */
+export async function realLocalPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(resolve(path));
+    if (parent === resolve(path)) return parent;
+    return join(await realLocalPath(parent), basename(path));
+  }
+}
+
 /**
- * Two keys can land on one local file: `a//b` and `a/b`, or `A.txt` and `a.txt` on a
- * case-insensitive disk. Only the first may write it, so an mv cannot delete the other's source.
+ * Two keys can land on one local file: `a//b` and `a/b`, `A.txt` and `a.txt` on a case-insensitive
+ * disk, or `real/x` and `link/x` through a symbolic link. Only the first may write it, so an mv
+ * cannot delete the other's source.
  */
-export function claimLocal(claimed: Set<string>, destination: Location, fold = foldsCase): void {
+export async function claimLocal(claimed: Set<string>, destination: Location, fold = foldsCase): Promise<void> {
   if (destination.type !== "local") return;
-  const key = localFileKey(destination.path, fold);
+  const key = localFileKey(await realLocalPath(destination.path), fold);
   if (claimed.has(key)) throw new Error(`another object is also written to ${destination.path}`);
   claimed.add(key);
 }
@@ -425,6 +454,50 @@ function checkKey(key: string, upload: boolean): void {
   if (Buffer.byteLength(key) > 1024 || (upload && /[\x00-\x1f\x7f\\]/.test(key)) ||
     key.split("/").some((part) => part === "." || part === "..")) {
     throw new Error(`unsupported object key: ${JSON.stringify(key)}`);
+  }
+}
+
+function retryable(error: unknown): boolean {
+  return BlobError.is(error) && (
+    error.code === "rate_limited" || error.code === "not_ready" ||
+    (error.status !== undefined && error.status >= 500)
+  ) || error instanceof TypeError && (error.message === "fetch failed" || error.message === "terminated") ||
+    error instanceof Error && error.name === "TimeoutError";
+}
+
+export interface UploadFile {
+  source: string;
+  key: string;
+  size: number;
+  contentType: string;
+}
+
+/** Streams one local file to the bucket, retrying transient failures from the start of the file. */
+export async function putFile(
+  bucket: Pick<Bucket, "put">,
+  file: UploadFile,
+  signal?: AbortSignal,
+  options: Pick<PutOptions, "cache" | "metadata"> = {},
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    if (signal?.aborted) throw new Error("upload interrupted");
+    const current = await stat(file.source);
+    if (!current.isFile() || current.size !== file.size) {
+      throw new Error("source changed since scanning; rerun the command");
+    }
+    const stream = createReadStream(file.source, { signal, highWaterMark: 64 * 1024 });
+    try {
+      const body = Readable.toWeb(stream, {
+        strategy: { highWaterMark: 64 * 1024, size: (chunk: Buffer) => chunk.byteLength },
+      }) as ReadableStream<Uint8Array>;
+      await bucket.put(file.key, body, { ...options, size: file.size, contentType: file.contentType });
+      return;
+    } catch (error) {
+      if (attempt >= 2 || signal?.aborted || !retryable(error)) throw error;
+    } finally {
+      stream.destroy();
+    }
+    await sleep(500 * 2 ** attempt);
   }
 }
 
@@ -504,10 +577,9 @@ async function perform(operation: Operation, settings: TransferSettings): Promis
     const bucket = await settings.resolver.open(destination.bucket);
     await putFile(bucket, {
       source: source.path,
-      path: destination.key,
+      key: destination.key,
       size: operation.size,
       contentType: settings.contentType ?? mime.getType(source.path) ?? "application/octet-stream",
-      follow: true,
     }, settings.signal, { cache: settings.cacheControl, metadata: settings.metadata });
     if (operation.move) await unlink(source.path);
     return;

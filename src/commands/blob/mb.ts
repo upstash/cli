@@ -7,17 +7,11 @@ import type { BlobBucket, BlobVisibility } from "../../types.js";
 import { BucketResolver, findAccountBucket } from "./buckets.js";
 import { parseVisibility } from "./create.js";
 import { deleteBlobBucket } from "./delete.js";
-import { formatLocation, listBlobs, parseBlobLocation, runOperations } from "./transfer.js";
-
-function bucketName(uri: string): string {
-  const location = parseBlobLocation(uri);
-  if (location.key) throw new Error(`${formatLocation(location)} includes a key; use blob://<bucket>`);
-  return location.bucket;
-}
+import { listBlobs, parseBucket, runOperations } from "./transfer.js";
 
 export function registerBlobMb(blob: Command): void {
   blob
-    .command("mb <uri>")
+    .command("mb <bucket>")
     .description("Create a bucket, like aws s3 mb (same as blob create)")
     .option(
       "--visibility <visibility>",
@@ -27,7 +21,7 @@ export function registerBlobMb(blob: Command): void {
     )
     .option("--cors <origins...>", "Allowed CORS origins (space-separated)")
     .action(async (uri: string, flags: { visibility: BlobVisibility; cors?: string[] }, cmd: Command) => {
-      const name = bucketName(uri);
+      const name = parseBucket(uri);
       const bucket = await request<BlobBucket>(resolveAuth(cmd), "POST", "/v2/blob/bucket", {
         name,
         visibility: flags.visibility,
@@ -39,12 +33,12 @@ export function registerBlobMb(blob: Command): void {
 
 export function registerBlobRb(blob: Command): void {
   blob
-    .command("rb <uri>")
+    .command("rb <bucket>")
     .description("Delete an empty bucket, or any bucket with --force, like aws s3 rb")
-    .option("--force", "First delete every object and abort incomplete multipart uploads")
-    .option("--quiet", "Suppress progress on stderr")
+    .option("-f, --force", "First delete every object and abort incomplete multipart uploads")
+    .option("-q, --quiet", "Suppress progress on stderr")
     .action(async (uri: string, flags: { force?: boolean; quiet?: boolean }, cmd: Command) => {
-      const name = bucketName(uri);
+      const name = parseBucket(uri);
       const resolver = new BucketResolver(cmd);
       const auth = resolver.auth();
       const match = findAccountBucket(await resolver.listAccountBuckets(), name);

@@ -61,7 +61,8 @@ async function copyStream(source: Location, destination: Location, options: Copy
         contentType: options.contentType ?? "application/octet-stream",
         cache: options.cacheControl,
         metadata: options.metadata,
-        ...(options.expectedSize === undefined ? { maxSize: "5gb" } : { size: options.expectedSize }),
+        // A declared size of 0 would make the SDK drop the stream, so it is buffered like no size.
+        ...(options.expectedSize ? { size: options.expectedSize } : { maxSize: "5gb" }),
       });
     } finally {
       process.removeListener("SIGINT", interrupt);
@@ -90,7 +91,7 @@ function registerTransfer(blob: Command, name: "cp" | "mv"): void {
     .description(name === "cp"
       ? "Copy a file or object, or a directory or prefix with --recursive, like aws s3 cp"
       : "Move a file or object, or a directory or prefix with --recursive, like aws s3 mv")
-    .option("--recursive", "Copy everything below a local directory or blob:// prefix");
+    .option("-r, --recursive", "Copy everything below a local directory or blob:// prefix");
   addObjectOptions(command);
   addCommonOptions(command);
   if (name === "cp") {
@@ -109,7 +110,8 @@ to the default unless --cache-control is given.
 
 Examples:
   upstash blob ${name} ./photo.png blob://my-bucket/images/
-  upstash blob ${name} blob://my-bucket/images ./images --recursive --exclude "*.tmp"
+  upstash blob ${name} ./site blob://my-bucket/site -r
+  upstash blob ${name} blob://my-bucket/images ./images -r --exclude "*.tmp"
   upstash blob ${name} blob://my-bucket/a.txt blob://other-bucket/b.txt
 `)
     .action(async (sourceArg: string, destinationArg: string, options: CopyOptions, cmd: Command) => {
@@ -145,7 +147,7 @@ Examples:
           const target = destinationFor(entry, destination, into);
           // An mv folds case everywhere: on a case-insensitive Linux mount, two keys writing one
           // file would otherwise both be deleted.
-          claimLocal(claimed, target, foldsCase || name === "mv");
+          await claimLocal(claimed, target, foldsCase || name === "mv");
           checkOverwritesSource(target, sourceInside);
           operations.push({
             action: transferAction(source, destination),

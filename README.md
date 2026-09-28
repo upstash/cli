@@ -133,8 +133,9 @@ upstash --env-path ./uploads.env blob sync ./assets blob://$BUCKET_ID/assets
 upstash blob credentials --token "$BLOB_TOKEN"
 ```
 
-`--token` overrides `UPSTASH_BLOB_TOKEN`. Exported environment variables take
-precedence over values loaded from `.env` or `--env-path`.
+`--token` and `UPSTASH_BLOB_TOKEN` are each used only for their own bucket, so they
+can point at different buckets. Exported environment variables take precedence
+over values loaded from `.env` or `--env-path`.
 
 ## Telemetry
 

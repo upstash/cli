@@ -1,6 +1,6 @@
 import { Bucket, BlobError } from "@upstash/blob";
 import { Command } from "commander";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -85,6 +85,25 @@ describe("bucket paths", () => {
       .rejects.toThrow("1 to 16");
     await expect(runCommand(await createBlobProgram(), ["blob", "rm", "build", "-r"])).rejects.toThrow("write blob://build");
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("sync --delete", () => {
+  it("keeps a local file reached through a symbolic link", async () => {
+    const dest = join(directory, "dest");
+    await mkdir(join(dest, "a"), { recursive: true });
+    await writeFile(join(dest, "a", "f.txt"), "hello");
+    await writeFile(join(dest, "stale.txt"), "old");
+    await symlink(join(dest, "a"), join(dest, "link"));
+    vi.spyOn(BucketResolver.prototype, "open").mockResolvedValue({
+      list: async () => ({ blobs: [{ path: "a/f.txt", size: 5, etag: "", uploadedAt: new Date(Date.now() + 1e7) }] }),
+    } as unknown as Bucket);
+    const result = await runCommand(await createBlobProgram(), ["blob", "sync", "blob://b/", dest, "-d", "-n", "-q"]);
+    expect(result).toEqual({
+      dry_run: true,
+      operations: [{ action: "delete", source: join(dest, "stale.txt"), size: 0 }],
+      unchanged: 1,
+    });
   });
 });
 

@@ -372,6 +372,17 @@ export function localFileKey(path: string, fold = foldsCase): string {
   return fold ? resolved.normalize("NFC").toLowerCase() : resolved;
 }
 
+/** The path with symbolic links resolved as far as it exists, so aliases of one file compare equal. */
+export async function realLocalPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(resolve(path));
+    if (parent === resolve(path)) return parent;
+    return join(await realLocalPath(parent), basename(path));
+  }
+}
+
 /**
  * Two keys can land on one local file: `a//b` and `a/b`, or `A.txt` and `a.txt` on a
  * case-insensitive disk. Only the first may write it, so an mv cannot delete the other's source.

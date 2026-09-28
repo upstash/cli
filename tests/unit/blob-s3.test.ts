@@ -250,6 +250,8 @@ describe("argument checks", () => {
     await expect(runCommand(await createBlobProgram(), ["blob", "rm", "blob://b"])).rejects.toThrow("names no object");
     await expect(runCommand(await createBlobProgram(), ["blob", "presign", "blob://b/k", "--expires-in", "0"]))
       .rejects.toThrow();
+    await expect(runCommand(await createBlobProgram(), ["blob", "presign", "blob://b/k", "--expires-in", "601"]))
+      .rejects.toThrow("from 1 to 600");
     await expect(runCommand(await createBlobProgram(), ["blob", "mb", "blob://b/key"])).rejects.toThrow("includes a key");
   });
 });

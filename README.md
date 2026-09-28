@@ -151,7 +151,7 @@ upstash blob cp blob://my-bucket/config.json - | jq .
 upstash blob mv blob://my-bucket/a.txt blob://other-bucket/a.txt
 upstash blob sync ./site blob://my-bucket/site --delete
 upstash blob rm blob://my-bucket/tmp --recursive --dryrun
-upstash blob presign blob://my-bucket/report.pdf --expires-in 3600
+upstash blob presign blob://my-bucket/report.pdf --expires-in 600
 upstash blob mb blob://new-bucket
 upstash blob rb blob://new-bucket --force
 ```

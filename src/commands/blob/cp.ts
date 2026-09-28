@@ -90,7 +90,7 @@ function registerTransfer(blob: Command, name: "cp" | "mv"): void {
     .description(name === "cp"
       ? "Copy a file or object, or a directory or prefix with --recursive, like aws s3 cp"
       : "Move a file or object, or a directory or prefix with --recursive, like aws s3 mv")
-    .option("--recursive", "Copy everything below a local directory or blob:// prefix");
+    .option("-r, --recursive", "Copy everything below a local directory or blob:// prefix");
   addObjectOptions(command);
   addCommonOptions(command);
   if (name === "cp") {
@@ -109,7 +109,8 @@ to the default unless --cache-control is given.
 
 Examples:
   upstash blob ${name} ./photo.png blob://my-bucket/images/
-  upstash blob ${name} blob://my-bucket/images ./images --recursive --exclude "*.tmp"
+  upstash blob ${name} ./site blob://my-bucket/site -r
+  upstash blob ${name} blob://my-bucket/images ./images -r --exclude "*.tmp"
   upstash blob ${name} blob://my-bucket/a.txt blob://other-bucket/b.txt
 `)
     .action(async (sourceArg: string, destinationArg: string, options: CopyOptions, cmd: Command) => {

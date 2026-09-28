@@ -12,22 +12,26 @@ interface ListOptions {
 
 export function registerBlobLs(blob: Command): void {
   blob
-    .command("ls [uri]")
-    .description("List buckets, or the objects and prefixes under blob://<bucket>/<prefix>, like aws s3 ls")
-    .option("--recursive", "List every object under the prefix instead of one level")
+    .command("ls [path]")
+    .alias("list")
+    .description("List buckets, or the objects and prefixes under <bucket>/<prefix>, like aws s3 ls")
+    .option("-r, --recursive", "List every object under the prefix instead of one level")
     .option("--summarize", "Add total_objects and total_size")
     .option("--token <token>", "Blob bucket token, used for the bucket it was issued for (default: UPSTASH_BLOB_TOKEN)")
     .addHelpText("after", `
-Without --recursive the prefix is matched as typed, so blob://my-bucket/img lists
-"img/" as a prefix; add the slash to list inside it.
+<path> is my-bucket/prefix or blob://my-bucket/prefix, by bucket name or id.
+Without --recursive the prefix is matched as typed, so my-bucket/img lists "img/"
+as a prefix; add the slash to list inside it.
+
+Examples:
+  upstash blob ls
+  upstash blob ls my-bucket
+  upstash blob ls my-bucket/images/ -r --summarize
 `)
     .action(async (uri: string | undefined, options: ListOptions, cmd: Command) => {
       const resolver = new BucketResolver(cmd, options.token);
       if (uri === undefined) {
-        const buckets = await resolver.listAccountBuckets();
-        printJSON(buckets
-          .map(({ name, id, visibility, creation_time }) => ({ name, id, visibility, creation_time }))
-          .sort((a, b) => a.name.localeCompare(b.name)));
+        printJSON(await resolver.listAccountBuckets());
         return;
       }
 

@@ -51,7 +51,7 @@ export function registerBlobSync(blob: Command): void {
   const command = blob
     .command("sync <source> <destination>")
     .description("Copy new and changed files between a directory and a blob:// prefix, or two prefixes, like aws s3 sync")
-    .option("--delete", "Delete destination files that are not in the source (filters still apply)")
+    .option("-d, --delete", "Delete destination files that are not in the source (filters still apply)")
     .option("--size-only", "Compare sizes only, ignoring modification times")
     .option("--exact-timestamps", "When downloading, also copy same-sized files whose times differ");
   addObjectOptions(command);
@@ -63,7 +63,7 @@ source is newer. Downloads set local modification times to the object's upload
 time, so a second sync copies nothing.
 
 Examples:
-  upstash blob sync ./site blob://my-bucket/site --delete
+  upstash blob sync ./site blob://my-bucket/site -d
   upstash blob sync blob://my-bucket/backups ./backups --exclude "*" --include "*.gz"
 `)
     .action(async (sourceArg: string, destinationArg: string, options: SyncOptions, cmd: Command) => {

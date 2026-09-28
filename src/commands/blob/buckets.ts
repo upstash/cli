@@ -8,6 +8,7 @@ import { telemetryStatus } from "../../telemetry.js";
 import type { BlobBucket } from "../../types.js";
 import { fetchBlobCredentials } from "./credentials.js";
 import { isFreshlyCreated, PROVISIONING_MAX_RETRIES, sleep } from "./retry.js";
+import { parseBucket } from "./transfer.js";
 
 /** The bucket id a Blob token was issued for, read from the token itself. */
 export function tokenBucketId(token: string): string | undefined {
@@ -21,6 +22,18 @@ export function findAccountBucket(buckets: BlobBucket[], name: string): BlobBuck
   const match = buckets.find((bucket) => bucket.id === name) ?? buckets.find((bucket) => bucket.name === name);
   if (!match) throw new Error(`Blob bucket "${name}" not found`);
   return match;
+}
+
+/**
+ * The id behind the bucket argument of get, delete and credentials. The hidden --bucket-id flag
+ * they used to require is still accepted, and used as is.
+ */
+export async function bucketIdArgument(command: Command, bucket: string | undefined, flags: { bucketId?: string }): Promise<string> {
+  if (bucket !== undefined && flags.bucketId !== undefined) throw new Error("Name the bucket once, not also with --bucket-id");
+  if (flags.bucketId !== undefined) return flags.bucketId;
+  if (bucket === undefined) throw new Error(`Name a bucket: upstash blob ${command.name()} <name-or-id>`);
+  const name = parseBucket(bucket);
+  return findAccountBucket(await request<BlobBucket[]>(resolveAuth(command), "GET", "/v2/blob/bucket"), name).id;
 }
 
 /**
@@ -53,6 +66,7 @@ export class BucketResolver {
   }
 
   private async resolve(name: string): Promise<Bucket> {
+    if (this.token !== undefined && !this.token.trim()) throw new Error("--token must be a non-empty Blob bucket token");
     const tokens = [this.token?.trim(), process.env.UPSTASH_BLOB_TOKEN?.trim()]
       .filter((token): token is string => typeof token === "string" && token.length > 0);
     const direct = tokens.find((token) => tokenBucketId(token) === name);

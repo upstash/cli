@@ -18,15 +18,15 @@ interface RemoveOptions extends CommonOptions {
 
 export function registerBlobRm(blob: Command): void {
   const command = blob
-    .command("rm <uri>")
+    .command("rm <path>")
     .description("Delete an object, or every object below a prefix with --recursive, like aws s3 rm")
-    .option("--recursive", "Delete every object below the prefix; blob://<bucket> alone empties the bucket");
+    .option("-r, --recursive", "Delete every object below the prefix; a bucket alone empties it");
   addCommonOptions(command);
   command
     .addHelpText("after", `
 Examples:
-  upstash blob rm blob://my-bucket/old.txt
-  upstash blob rm blob://my-bucket/tmp --recursive --dryrun
+  upstash blob rm my-bucket/old.txt
+  upstash blob rm my-bucket/tmp -r -n
 `)
     .action(async (uri: string, options: RemoveOptions, cmd: Command) => {
       const location = parseBlobLocation(uri);

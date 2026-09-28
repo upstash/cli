@@ -100,7 +100,9 @@ describe("local collisions", () => {
     if (process.platform === "linux") await expect(lower).resolves.toBeUndefined();
     else await expect(lower).rejects.toThrow("also written");
     await expect(claimLocal(claimed, { type: "blob", bucket: "b", key: "README.md" })).resolves.toBeUndefined();
-    await expect(claimLocal(claimed, { type: "local", path: join(directory, "Readme.MD") }, true)).rejects.toThrow("also written");
+    const folded = new Set<string>();
+    await claimLocal(folded, { type: "local", path: join(directory, "README.md") }, true);
+    await expect(claimLocal(folded, { type: "local", path: join(directory, "Readme.MD") }, true)).rejects.toThrow("also written");
   });
 
   it("sees a file through a symbolic link as the same file", async () => {

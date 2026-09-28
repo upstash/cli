@@ -384,12 +384,13 @@ export async function realLocalPath(path: string): Promise<string> {
 }
 
 /**
- * Two keys can land on one local file: `a//b` and `a/b`, or `A.txt` and `a.txt` on a
- * case-insensitive disk. Only the first may write it, so an mv cannot delete the other's source.
+ * Two keys can land on one local file: `a//b` and `a/b`, `A.txt` and `a.txt` on a case-insensitive
+ * disk, or `real/x` and `link/x` through a symbolic link. Only the first may write it, so an mv
+ * cannot delete the other's source.
  */
-export function claimLocal(claimed: Set<string>, destination: Location, fold = foldsCase): void {
+export async function claimLocal(claimed: Set<string>, destination: Location, fold = foldsCase): Promise<void> {
   if (destination.type !== "local") return;
-  const key = localFileKey(destination.path, fold);
+  const key = localFileKey(await realLocalPath(destination.path), fold);
   if (claimed.has(key)) throw new Error(`another object is also written to ${destination.path}`);
   claimed.add(key);
 }

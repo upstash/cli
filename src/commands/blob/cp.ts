@@ -61,7 +61,8 @@ async function copyStream(source: Location, destination: Location, options: Copy
         contentType: options.contentType ?? "application/octet-stream",
         cache: options.cacheControl,
         metadata: options.metadata,
-        ...(options.expectedSize === undefined ? { maxSize: "5gb" } : { size: options.expectedSize }),
+        // A declared size of 0 would make the SDK drop the stream, so it is buffered like no size.
+        ...(options.expectedSize ? { size: options.expectedSize } : { maxSize: "5gb" }),
       });
     } finally {
       process.removeListener("SIGINT", interrupt);
@@ -146,7 +147,7 @@ Examples:
           const target = destinationFor(entry, destination, into);
           // An mv folds case everywhere: on a case-insensitive Linux mount, two keys writing one
           // file would otherwise both be deleted.
-          claimLocal(claimed, target, foldsCase || name === "mv");
+          await claimLocal(claimed, target, foldsCase || name === "mv");
           checkOverwritesSource(target, sourceInside);
           operations.push({
             action: transferAction(source, destination),

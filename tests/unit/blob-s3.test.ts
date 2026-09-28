@@ -92,15 +92,23 @@ describe("local collisions", () => {
     expect(localRel("a/b")).toBe("a/b");
   });
 
-  it("lets only one key write a local file, ignoring case where the disk does", () => {
+  it("lets only one key write a local file, ignoring case where the disk does", async () => {
     const claimed = new Set<string>();
-    claimLocal(claimed, { type: "local", path: join(directory, "README.md") });
-    expect(() => claimLocal(claimed, { type: "local", path: join(directory, "sub", "..", "README.md") })).toThrow("also written");
-    const lower = expect(() => claimLocal(claimed, { type: "local", path: join(directory, "readme.md") }));
-    if (process.platform === "linux") lower.not.toThrow();
-    else lower.toThrow("also written");
-    expect(() => claimLocal(claimed, { type: "blob", bucket: "b", key: "README.md" })).not.toThrow();
-    expect(() => claimLocal(claimed, { type: "local", path: join(directory, "Readme.MD") }, true)).toThrow("also written");
+    await claimLocal(claimed, { type: "local", path: join(directory, "README.md") });
+    await expect(claimLocal(claimed, { type: "local", path: join(directory, "sub", "..", "README.md") })).rejects.toThrow("also written");
+    const lower = claimLocal(claimed, { type: "local", path: join(directory, "readme.md") });
+    if (process.platform === "linux") await expect(lower).resolves.toBeUndefined();
+    else await expect(lower).rejects.toThrow("also written");
+    await expect(claimLocal(claimed, { type: "blob", bucket: "b", key: "README.md" })).resolves.toBeUndefined();
+    await expect(claimLocal(claimed, { type: "local", path: join(directory, "Readme.MD") }, true)).rejects.toThrow("also written");
+  });
+
+  it("sees a file through a symbolic link as the same file", async () => {
+    await mkdir(join(directory, "real"));
+    await symlink(join(directory, "real"), join(directory, "link"));
+    const claimed = new Set<string>();
+    await claimLocal(claimed, { type: "local", path: join(directory, "real", "x") });
+    await expect(claimLocal(claimed, { type: "local", path: join(directory, "link", "x") })).rejects.toThrow("also written");
   });
 
   it("finds a destination prefix nested in the source within one bucket", async () => {

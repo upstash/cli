@@ -104,7 +104,7 @@ Examples:
         const target = current.get(rel);
         try {
           const to = target?.location ?? destinationFor(entry, destination, true);
-          claimLocal(claimed, to);
+          await claimLocal(claimed, to);
           if (to.type === "local") written.push(to.path);
           checkOverwritesSource(to, sourceInside);
           if (target && !needsSync(entry, target, action, options)) {

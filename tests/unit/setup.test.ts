@@ -3,10 +3,12 @@ import { Command } from "commander";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { registerSetup, setRunner } from "../../src/commands/setup.js";
 import { runCommand } from "../../src/setup/plugins.js";
 import { parseTar, stripTopDir } from "../../src/setup/repo.js";
+import { setPromptIO } from "../../src/setup/ui.js";
 import { mergeServerEntry, upsertTomlTable, buildTomlTable } from "../../src/setup/mcp-config.js";
 
 // --- a tiny tar writer, so the fixtures need no binaries ---------------------
@@ -105,6 +107,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   setRunner(runCommand);
+  setPromptIO({});
   process.chdir(origCwd);
   process.env.HOME = origHome;
   process.exitCode = 0;
@@ -281,5 +284,55 @@ describe("setup", () => {
 
     const again = await runJson(["--cursor"]);
     expect(again.results[0]!.notes.join(" ")).toMatch(/also declares an "upstash" MCP server/);
+  });
+
+  describe("interactive", () => {
+    const ENTER = "\r";
+    const SPACE = " ";
+    const DOWN = "\x1b[B";
+
+    /** Runs setup against fake terminal streams, typing one key batch per prompt. */
+    async function interactive(argv: string[], answers: string[]): Promise<string> {
+      const input = new PassThrough();
+      const output = new PassThrough();
+      let screen = "";
+      output.on("data", (d) => (screen += d.toString()));
+      setPromptIO({ input, output });
+      const done = program().parseAsync(["node", "upstash", "setup", ...argv]);
+      for (const keys of answers) {
+        await new Promise((r) => setTimeout(r, 30));
+        for (const key of keys.match(/\x1b\[.|./gs) ?? []) input.write(key);
+      }
+      await done;
+      return screen;
+    }
+
+    it("asks for scope, agents and auth, then sets up the picked agents", async () => {
+      mkdirSync(join(home, ".cursor"));
+      // Scope: All projects. Agents: Cursor is pre-checked as detected; also tick OpenCode (7th row).
+      const screen = await interactive(
+        [],
+        [ENTER, DOWN.repeat(6) + SPACE + ENTER, ENTER, ENTER],
+      );
+      expect(screen).toContain("Which agents should use Upstash?");
+      expect(screen).toContain("Connected 2 agents to Upstash.");
+      expect(existsSync(join(home, ".cursor", "plugins", "local", "upstash", ".cursor-plugin", "plugin.json"))).toBe(true);
+      expect(readJson(".config", "opencode", "opencode.json").mcp.upstash.url).toBe("https://mcp.upstash.com/mcp");
+    });
+
+    it("skips questions answered by flags and prompts for missing API-key credentials", async () => {
+      process.chdir(home);
+      const screen = await interactive(["--codex", "--project"], [DOWN + ENTER, "me@x.com" + ENTER, "sk" + ENTER, ENTER]);
+      expect(screen).not.toContain("Where should Upstash be set up?");
+      expect(screen).not.toContain("Which agents");
+      expect(calls).toEqual([]);
+      expect(read(".codex", "config.toml")).toContain('Authorization = "Bearer me@x.com:sk"');
+    });
+
+    it("changes nothing when the plan is declined", async () => {
+      await interactive(["--opencode"], [ENTER, ENTER, DOWN + ENTER]);
+      expect(process.exitCode).toBe(130);
+      expect(existsSync(join(home, ".config"))).toBe(false);
+    });
   });
 });

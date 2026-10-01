@@ -33,6 +33,8 @@ It picks the best install path per agent:
 | Cursor | The Upstash plugin as a local plugin in `~/.cursor/plugins/local/upstash` |
 | VS Code, GitHub Copilot CLI, OpenCode | The remote MCP server in the agent's config, plus the `upstash` skill |
 
+In a terminal it walks you through a few prompts: where to install (all projects or just this one), which agents (detected ones are pre-selected), and how they sign in. Flags answer a question up front; `-y` or `--json` skip the prompts entirely.
+
 Agents are detected from their config directories, or chosen with flags (`--claude --cursor ...`). If a plugin can't be installed (for example the agent's CLI isn't on your `PATH`), setup falls back to MCP + skill for that agent.
 
 ```bash

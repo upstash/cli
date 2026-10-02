@@ -132,7 +132,7 @@ Examples:
       const [skip, sourceInside] = recursive
         ? await Promise.all([nestedPrefix(source, destination, resolver), nestedPrefix(destination, source, resolver)])
         : [];
-      const entries = (await listSource(source, recursive, resolver)).filter((entry) =>
+      const entries = (await listSource(source, recursive, resolver, options.followSymlinks)).filter((entry) =>
         isIncluded(entry.rel, filters) && !(skip !== undefined && entry.location.type === "blob" && entry.location.key.startsWith(skip)));
       const into = recursive || (destination.type === "blob"
         ? !destination.key || destination.key.endsWith("/")
@@ -144,6 +144,9 @@ Examples:
         // Zero-byte "folder" markers have no local file to become.
         if (destination.type === "local" && entry.rel.endsWith("/")) continue;
         try {
+          if (name === "mv" && entry.linked) {
+            throw new Error("is behind a symbolic link to a directory, so moving it would delete the link's target; use cp, or --no-follow-symlinks");
+          }
           const target = destinationFor(entry, destination, into);
           // An mv folds case everywhere: on a case-insensitive Linux mount, two keys writing one
           // file would otherwise both be deleted.

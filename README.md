@@ -113,7 +113,8 @@ order, last match wins), `-n/--dryrun`, `-d/--delete`, `--size-only`,
 `--exact-timestamps`, `--content-type`, `--cache-control`, `--metadata`,
 `--expected-size`, `--concurrency` and `-q/--quiet`. Copies between buckets reset
 Cache-Control to the default unless `--cache-control` is given. Local symbolic
-links are followed.
+links are followed unless `--no-follow-symlinks` is given. Nothing is deleted
+through a link to a directory: `mv` refuses such files and `sync -d` keeps them.
 
 Progress goes to stderr and a JSON summary to stdout. Transfers retry transient
 failures, keep going past a failed file, and exit unsuccessfully at the end. Large

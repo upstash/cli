@@ -107,6 +107,43 @@ describe("sync --delete", () => {
   });
 });
 
+describe("symbolic links to directories", () => {
+  beforeEach(async () => {
+    await mkdir(join(directory, "outside"));
+    await writeFile(join(directory, "outside", "precious.txt"), "keep");
+  });
+
+  it("are never deleted through by sync --delete", async () => {
+    const dest = join(directory, "dest");
+    await mkdir(dest);
+    await writeFile(join(dest, "stale.txt"), "old");
+    await symlink(join(directory, "outside"), join(dest, "link"));
+    vi.spyOn(BucketResolver.prototype, "open").mockResolvedValue({
+      list: async () => ({ blobs: [] }),
+    } as unknown as Bucket);
+    const result = await runCommand(await createBlobProgram(), ["blob", "sync", "blob://b/", dest, "-d", "-n", "-q"]);
+    expect(result).toEqual({
+      dry_run: true,
+      operations: [{ action: "delete", source: join(dest, "stale.txt"), size: 0 }],
+      unchanged: 0,
+    });
+  });
+
+  it("are refused as mv sources, and skipped with --no-follow-symlinks", async () => {
+    const source = join(directory, "src");
+    await mkdir(source);
+    await writeFile(join(source, "a.txt"), "a");
+    await symlink(join(directory, "outside"), join(source, "link"));
+    const mv = ["blob", "mv", source, "blob://b/dest", "-r", "-n", "-q"];
+    await expect(runCommand(await createBlobProgram(), mv)).rejects.toThrow("1 entries would be skipped");
+    const result = await runCommand(await createBlobProgram(), [...mv, "--no-follow-symlinks"]);
+    expect(result).toEqual({
+      dry_run: true,
+      operations: [{ action: "move", source: join(source, "a.txt"), destination: "blob://b/dest/a.txt", size: 1 }],
+    });
+  });
+});
+
 describe("putFile", () => {
   it("reopens the stream when retrying a transient failure", async () => {
     let attempts = 0;

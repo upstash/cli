@@ -166,6 +166,7 @@ export interface CommonOptions {
 }
 
 export interface ObjectOptions {
+  followSymlinks?: boolean;
   contentType?: string;
   cacheControl?: string;
   metadata?: Record<string, string>;
@@ -186,7 +187,8 @@ export function addObjectOptions(command: Command): Command {
   return command
     .option("--content-type <type>", "Content type for every written object (default: guessed from the file name, or kept on copies)")
     .option("--cache-control <value>", "Cache-Control for written objects: a header value, a duration like 1h, immutable, revalidate or no-store")
-    .option("--metadata <pairs>", "Metadata for written objects, as key=value[,key=value] or a JSON object", parseMetadata);
+    .option("--metadata <pairs>", "Metadata for written objects, as key=value[,key=value] or a JSON object", parseMetadata)
+    .option("--no-follow-symlinks", "Skip symbolic links in local source directories instead of following them");
 }
 
 export function isDryRun(options: { dryrun?: boolean; dryRun?: boolean }): boolean {
@@ -202,24 +204,31 @@ export interface Entry {
   /** Local mtime or the object's LastModified, in milliseconds. */
   mtime: number;
   location: Location;
+  /** Reached through a symbolic link to a directory, so deleting it deletes a file outside the walked tree. */
+  linked?: boolean;
 }
 
 function errorCode(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException | undefined)?.code;
 }
 
-/** Symbolic links are followed as aws s3 does; one that loops back to its own ancestor is skipped. */
-async function walk(root: string): Promise<Entry[]> {
+/**
+ * Symbolic links are followed as aws s3 does, unless `follow` is false; one that loops back to its
+ * own ancestor is skipped. Files below a linked directory are marked, so nothing deletes them.
+ */
+async function walk(root: string, follow = true): Promise<Entry[]> {
   const entries: Entry[] = [];
-  const visit = async (directory: string, ancestors: Set<string>): Promise<void> => {
+  const visit = async (directory: string, ancestors: Set<string>, linked: boolean): Promise<void> => {
     const real = await realpath(directory);
     if (ancestors.has(real)) return;
     const chain = new Set(ancestors).add(real);
     for await (const dirent of await opendir(directory)) {
       const path = join(directory, dirent.name);
+      const link = dirent.isSymbolicLink();
+      if (link && !follow) continue;
       // A dangling link has nothing to copy.
-      const info = dirent.isSymbolicLink() ? await stat(path).catch(() => undefined) : dirent;
-      if (info?.isDirectory()) await visit(path, chain);
+      const info = link ? await stat(path).catch(() => undefined) : dirent;
+      if (info?.isDirectory()) await visit(path, chain, linked || link);
       else if (info?.isFile()) {
         const { size, mtimeMs } = await stat(path);
         entries.push({
@@ -227,11 +236,12 @@ async function walk(root: string): Promise<Entry[]> {
           size,
           mtime: mtimeMs,
           location: { type: "local", path },
+          ...(linked && { linked }),
         });
       }
     }
   };
-  await visit(root, new Set());
+  await visit(root, new Set(), false);
   return entries;
 }
 
@@ -260,7 +270,12 @@ export async function listBlobs(bucket: Bucket, location: BlobLocation, prefix: 
 }
 
 /** What a cp, mv or sync reads: one file or object, or everything below a directory or prefix. */
-export async function listSource(location: Location, recursive: boolean, resolver: BucketResolver): Promise<Entry[]> {
+export async function listSource(
+  location: Location,
+  recursive: boolean,
+  resolver: BucketResolver,
+  followSymlinks = true,
+): Promise<Entry[]> {
   if (location.type === "local") {
     let info;
     try {
@@ -271,7 +286,7 @@ export async function listSource(location: Location, recursive: boolean, resolve
     }
     if (info.isDirectory()) {
       if (!recursive) throw new Error(`${location.path} is a directory; use --recursive`);
-      return walk(location.path);
+      return walk(location.path, followSymlinks);
     }
     if (!info.isFile()) throw new Error(`${location.path} is not a regular file`);
     if (recursive) throw new Error(`${location.path} is a file; --recursive needs a directory`);

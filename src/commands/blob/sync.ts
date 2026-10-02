@@ -77,7 +77,7 @@ Examples:
       const filters = filtersOf(options);
       const action = transferAction(source, destination);
       const [sources, existing, destinationInside, sourceInside] = await Promise.all([
-        listSource(source, true, resolver),
+        listSource(source, true, resolver, options.followSymlinks),
         listDestination(destination, resolver),
         nestedPrefix(source, destination, resolver),
         nestedPrefix(destination, source, resolver),
@@ -123,7 +123,8 @@ Examples:
         const fileKey = async (path: string): Promise<string> => localFileKey(await realLocalPath(path), true);
         const kept = new Set(await Promise.all(written.map(fileKey)));
         for (const [rel, entry] of current) {
-          if (wanted.has(rel)) continue;
+          // Deleting below a linked directory would delete outside the destination.
+          if (wanted.has(rel) || entry.linked) continue;
           if (entry.location.type === "local" && kept.has(await fileKey(entry.location.path))) continue;
           operations.push({ action: "delete", source: entry.location, size: 0 });
         }

@@ -17,6 +17,35 @@ For agents, pair the CLI with the [Upstash Skill](https://docs.upstash.com/agent
 npx skills add upstash/skills
 ```
 
+## Connect your AI agent
+
+One command wires Upstash into your coding agents:
+
+```bash
+npx @upstash/cli setup
+```
+
+It picks the best install path per agent:
+
+| Agent | What gets installed |
+|---|---|
+| Claude Code, Codex, Gemini CLI | The Upstash plugin via the agent's own CLI (MCP server + skills) |
+| Cursor | The Upstash plugin as a local plugin in `~/.cursor/plugins/local/upstash` |
+| VS Code, GitHub Copilot CLI, OpenCode | The remote MCP server in the agent's config, plus the `upstash` skill |
+
+In a terminal it walks you through a few prompts: where to install (all projects or just this one) and which agents (detected ones are pre-selected). Flags answer a question up front; `-y` or `--json` skip the prompts entirely.
+
+Agents are detected from their config directories, or chosen with flags (`--claude --cursor ...`). If a plugin can't be installed (for example the agent's CLI isn't on your `PATH`), setup falls back to MCP + skill for that agent.
+
+```bash
+upstash setup --claude --cursor -y        # no prompts
+upstash setup --project                    # this repo instead of your user config
+upstash setup --mode mcp                   # MCP + skill everywhere, no plugins
+upstash setup --dry-run                    # show what would change
+```
+
+The MCP server signs in with OAuth: on first use your agent opens a consent page where you pick the account (turn read-only off if the agent should change resources). Setup never writes an API key into an agent's config. Rerunning `setup` updates what it installed.
+
 ## No account? Start with a free Redis
 
 If you are an AI agent (or just want to try things out) and need a Redis DB to use or experiment with, you don't need an Upstash account:

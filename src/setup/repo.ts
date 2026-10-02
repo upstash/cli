@@ -1,0 +1,146 @@
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, normalize, sep } from "node:path";
+import { gunzipSync } from "node:zlib";
+import { SKILLS_REPO } from "./agents.js";
+
+/** Repo-relative path → file contents. */
+export type RepoFiles = Map<string, Buffer>;
+
+function cString(buf: Buffer, start: number, length: number): string {
+  const slice = buf.subarray(start, start + length);
+  const nul = slice.indexOf(0);
+  return slice.subarray(0, nul === -1 ? slice.length : nul).toString("utf8");
+}
+
+function paxPath(body: Buffer): string | undefined {
+  // Records are "<len> key=value\n", len counting the whole record.
+  let offset = 0;
+  while (offset < body.length) {
+    const space = body.indexOf(0x20, offset);
+    if (space === -1) break;
+    const len = Number.parseInt(body.subarray(offset, space).toString("utf8"), 10);
+    if (!Number.isFinite(len) || len <= 0) break;
+    const record = body.subarray(space + 1, offset + len - 1).toString("utf8");
+    const eq = record.indexOf("=");
+    if (eq !== -1 && record.slice(0, eq) === "path") return record.slice(eq + 1);
+    offset += len;
+  }
+  return undefined;
+}
+
+/** Minimal reader for the ustar/pax archives GitHub serves; regular files only. */
+export function parseTar(tar: Buffer): RepoFiles {
+  const files: RepoFiles = new Map();
+  let offset = 0;
+  let longName: string | undefined;
+  while (offset + 512 <= tar.length) {
+    const header = tar.subarray(offset, offset + 512);
+    if (header.every((b) => b === 0)) break;
+    const size = Number.parseInt(cString(header, 124, 12).trim() || "0", 8);
+    const type = String.fromCharCode(header[156] ?? 0);
+    const bodyStart = offset + 512;
+    const body = tar.subarray(bodyStart, bodyStart + size);
+    offset = bodyStart + Math.ceil(size / 512) * 512;
+
+    if (type === "x") {
+      longName = paxPath(body) ?? longName;
+      continue;
+    }
+    if (type === "L") {
+      longName = cString(body, 0, body.length);
+      continue;
+    }
+    if (type === "g") continue;
+
+    const name = cString(header, 0, 100);
+    const prefix = cString(header, 345, 155);
+    const path = longName ?? (prefix ? `${prefix}/${name}` : name);
+    longName = undefined;
+    if (type === "0" || type === "\0") files.set(path, Buffer.from(body));
+  }
+  return files;
+}
+
+/** GitHub tarballs nest everything under `<repo>-<ref>/`. */
+export function stripTopDir(files: RepoFiles): RepoFiles {
+  const out: RepoFiles = new Map();
+  for (const [path, content] of files) {
+    const slash = path.indexOf("/");
+    if (slash !== -1 && slash < path.length - 1) out.set(path.slice(slash + 1), content);
+  }
+  return out;
+}
+
+/** Downloads upstash/skills at its default branch. */
+export async function fetchSkillsRepo(): Promise<RepoFiles> {
+  const url = `https://codeload.github.com/${SKILLS_REPO}/tar.gz/main`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { "User-Agent": "upstash/cli" } });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`Could not download ${SKILLS_REPO}: ${reason}`);
+  }
+  if (!res.ok) throw new Error(`Could not download ${SKILLS_REPO}: HTTP ${res.status}`);
+  return stripTopDir(parseTar(gunzipSync(Buffer.from(await res.arrayBuffer()))));
+}
+
+/** Files under `prefix/`, keyed by their path relative to it. */
+export function subtree(files: RepoFiles, prefix: string): RepoFiles {
+  const base = prefix.endsWith("/") ? prefix : `${prefix}/`;
+  const out: RepoFiles = new Map();
+  for (const [path, content] of files) {
+    if (path.startsWith(base)) out.set(path.slice(base.length), content);
+  }
+  return out;
+}
+
+/**
+ * Replaces `dest` with exactly `files`, so files removed upstream do not linger.
+ * `dest` is always a directory this CLI owns (named `upstash`). Every path is
+ * checked and the tree is written to a staging directory first, then swapped
+ * in through a backup, so a bad archive or a failed write or rename leaves the
+ * previous install in place.
+ */
+export async function writeTree(files: RepoFiles, dest: string): Promise<number> {
+  if (files.size === 0) throw new Error(`Nothing to install into ${dest}`);
+  const entries = [...files].map(([rel, content]) => {
+    const clean = normalize(rel);
+    if (isAbsolute(clean) || clean === ".." || clean.startsWith(`..${sep}`)) {
+      throw new Error(`Refusing to write outside ${dest}: ${rel}`);
+    }
+    return [clean, content] as const;
+  });
+  const staging = `${dest}.tmp-${process.pid}`;
+  await rm(staging, { recursive: true, force: true });
+  try {
+    for (const [clean, content] of entries) {
+      const target = join(staging, clean);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, content);
+    }
+  } catch (err) {
+    await rm(staging, { recursive: true, force: true });
+    throw err;
+  }
+  // Swap through a backup so a failed rename can put the previous install back.
+  const backup = `${dest}.old-${process.pid}`;
+  await rm(backup, { recursive: true, force: true });
+  let hadPrevious = false;
+  try {
+    hadPrevious = await rename(dest, backup).then(
+      () => true,
+      (err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") return false;
+        throw err;
+      },
+    );
+    await rename(staging, dest);
+  } catch (err) {
+    if (hadPrevious) await rename(backup, dest);
+    await rm(staging, { recursive: true, force: true });
+    throw err;
+  }
+  if (hadPrevious) await rm(backup, { recursive: true, force: true });
+  return files.size;
+}

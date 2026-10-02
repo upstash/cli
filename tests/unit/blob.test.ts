@@ -64,6 +64,7 @@ describe("blob command registration", () => {
       "get",
       "delete",
       "credentials",
+      "upload",
     ]);
   });
 });
@@ -230,7 +231,9 @@ describe("blob credentials command", () => {
     });
   });
 
-  it("without bucket id uses UPSTASH_BLOB_TOKEN and skips Developer API auth", async () => {
+  it.each(["environment", "flag"])("uses the %s token and skips Developer API auth", async (source) => {
+    delete process.env.UPSTASH_EMAIL;
+    delete process.env.UPSTASH_API_KEY;
     process.env.UPSTASH_BLOB_TOKEN = "env-bucket-token";
     const credentials = makeCredentials();
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -238,11 +241,15 @@ describe("blob credentials command", () => {
     );
 
     const program = await createBlobProgram();
-    const result = await runCommand(program, ["blob", "credentials"]);
+    const flags = source === "flag" ? ["--token", "flag-bucket-token"] : [];
+    const result = await runCommand(program, ["blob", "credentials", ...flags]);
 
     expect(result).toEqual(credentials);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://blob.upstash.io/v1/credentials");
+    expect((fetchSpy.mock.calls[0]?.[1] as RequestInit).headers).toEqual({
+      Authorization: `Bearer ${source === "flag" ? "flag-bucket-token" : "env-bucket-token"}`,
+    });
   });
 
   it("explicit bucket id wins over an ambient UPSTASH_BLOB_TOKEN", async () => {
@@ -270,7 +277,7 @@ describe("blob credentials command", () => {
     const program = await createBlobProgram();
 
     await expect(runCommand(program, ["blob", "credentials"]))
-      .rejects.toThrow(/either --bucket-id.*UPSTASH_BLOB_TOKEN/);
+      .rejects.toThrow(/--token.*UPSTASH_BLOB_TOKEN.*--bucket-id/);
   });
 
   it("prints successful credential responses unchanged", async () => {

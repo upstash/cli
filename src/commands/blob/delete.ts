@@ -1,7 +1,8 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { HttpError, request } from "../../client.js";
 import { printJSON } from "../../output.js";
+import { bucketIdArgument } from "./buckets.js";
 import { sleep } from "./retry.js";
 import type { Sleep } from "./retry.js";
 import type { Auth } from "../../auth.js";
@@ -39,17 +40,17 @@ export async function deleteBlobBucket(
 
 export function registerBlobDelete(blob: Command): void {
   blob
-    .command("delete")
-    .description("Delete a Blob bucket")
-    .requiredOption("--bucket-id <id>", "Blob bucket ID")
-    .option("--dry-run", "Preview the action without executing it")
-    .action(async (flags: { bucketId: string; dryRun?: boolean }, command: Command) => {
+    .command("delete [bucket]")
+    .description("Delete an empty Blob bucket, by name or id")
+    .addOption(new Option("--bucket-id <id>").hideHelp())
+    .option("-n, --dry-run", "Preview the action without executing it")
+    .action(async (name: string | undefined, flags: { bucketId?: string; dryRun?: boolean }, command: Command) => {
+      const id = await bucketIdArgument(command, name, flags);
       if (flags.dryRun) {
-        printJSON({ action: "delete", bucket_id: flags.bucketId, dry_run: true });
+        printJSON({ action: "delete", bucket_id: id, dry_run: true });
         return;
       }
-      const auth = resolveAuth(command);
-      await deleteBlobBucket(auth, flags.bucketId);
-      printJSON({ deleted: true, bucket_id: flags.bucketId });
+      await deleteBlobBucket(resolveAuth(command), id);
+      printJSON({ deleted: true, bucket_id: id });
     });
 }

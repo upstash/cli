@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveAuth } from "../auth.js";
 import { plainError } from "../output.js";
 import {
   AGENT_NAMES,
@@ -9,7 +8,6 @@ import {
   SKILLS_REPO,
   getAgent,
   type AgentName,
-  type McpAuth,
   type Scope,
 } from "../setup/agents.js";
 import { hasMcpEntry, resolveMcpPath, writeMcpEntry } from "../setup/mcp-config.js";
@@ -18,19 +16,15 @@ import { fetchSkillsRepo, subtree, writeTree, type RepoFiles } from "../setup/re
 import * as ui from "../setup/ui.js";
 
 type Mode = "auto" | "plugin" | "mcp";
-type AuthMode = McpAuth["mode"];
 type Method = "plugin" | "mcp";
 
 interface SetupFlags extends Partial<Record<AgentName, boolean>> {
   mode: string;
-  auth: string;
   project?: boolean;
   yes?: boolean;
   ref: string;
   dryRun?: boolean;
   json?: boolean;
-  email?: string;
-  apiKey?: string;
 }
 
 export interface AgentResult {
@@ -61,11 +55,6 @@ export function registerSetup(program: Command): void {
 
   command
     .option("--mode <mode>", "auto (plugin where supported, else MCP + skill), plugin, or mcp", "auto")
-    .option(
-      "--auth <auth>",
-      "oauth (browser consent on first use) or api-key (saved login, --email/--api-key, or UPSTASH_EMAIL/UPSTASH_API_KEY)",
-      "oauth",
-    )
     .option("-p, --project", "Configure the current project instead of your user config")
     .option("-y, --yes", "Do not prompt; without agent flags, set up every detected agent")
     .option("--ref <ref>", `Git ref of ${SKILLS_REPO} to install from`, "main")
@@ -153,49 +142,12 @@ async function promptAgents(flags: SetupFlags, scope: Scope): Promise<AgentName[
   );
 }
 
-async function promptAuth(flags: SetupFlags, cmd: Command): Promise<McpAuth> {
-  if (cmd.getOptionValueSource("auth") !== "default" || flags.email || flags.apiKey) {
-    return resolveMcpAuth(flags, cmd);
-  }
-  const mode = await ui.pickOne<AuthMode>(
-    "How should agents sign in to Upstash?",
-    [
-      { value: "oauth", label: "OAuth", hint: "browser consent on first use, recommended" },
-      { value: "api-key", label: "API key", hint: "stored in the agent's MCP config; plugins need OAuth" },
-    ],
-    "oauth",
-  );
-  if (mode === "oauth") return { mode };
-  try {
-    const { email, apiKey } = resolveAuth(cmd);
-    ui.info(`Using the saved credentials for ${ui.bold(email)}`);
-    return { mode, token: `${email}:${apiKey}` };
-  } catch {
-    const email = await ui.askText("Upstash account email", { placeholder: "you@example.com" });
-    const apiKey = await ui.askText(
-      `Management API key ${ui.dim("(console.upstash.com/account/api)")}`,
-      { secret: true },
-    );
-    return { mode, token: `${email}:${apiKey}` };
-  }
-}
-
-function resolveMcpAuth(flags: SetupFlags, cmd: Command): McpAuth {
-  // Passing --email/--api-key is a clear signal, unless --auth says otherwise.
-  const explicitKey = Boolean(flags.email || flags.apiKey);
-  const mode: AuthMode =
-    cmd.getOptionValueSource("auth") === "default" && explicitKey ? "api-key" : (flags.auth as AuthMode);
-  if (mode === "oauth") return { mode };
-  const { email, apiKey } = resolveAuth(cmd);
-  return { mode, token: `${email}:${apiKey}` };
-}
-
 /** Picks plugin vs MCP + skill for one agent, with the reason when the plugin is ruled out up front. */
 function chooseMethod(
   name: AgentName,
   mode: Mode,
   scope: Scope,
-  auth: McpAuth,
+  ref: string,
 ): { method: Method; note?: string } {
   const plugin = getAgent(name).plugin;
   if (mode === "mcp") return { method: "mcp" };
@@ -207,8 +159,9 @@ function chooseMethod(
   if (!plugin.scopes.includes(scope)) {
     return { method: "mcp", note: "Plugins install per user, not per project; wrote project-level MCP + skill instead." };
   }
-  if (auth.mode === "api-key") {
-    return { method: "mcp", note: "The plugin authenticates with OAuth only; wrote MCP config with your API key instead." };
+  // Claude Code and Codex install from the marketplace's default branch, so they cannot pin a ref.
+  if (ref !== "main" && (plugin.kind === "claude" || plugin.kind === "codex")) {
+    return { method: "mcp", note: `The plugin installs from the marketplace's default branch; installed MCP + skill from ${ref} instead.` };
   }
   return { method: "plugin" };
 }
@@ -216,13 +169,12 @@ function chooseMethod(
 async function setupMcp(
   name: AgentName,
   scope: Scope,
-  auth: McpAuth,
   dryRun: boolean,
   repo: () => Promise<RepoFiles>,
 ): Promise<{ ok: boolean; steps: Step[] }> {
   const agent = getAgent(name);
   const steps: Step[] = [];
-  const mcpLabel = `MCP server upstash (${auth.mode === "api-key" ? "API key" : "OAuth"})`;
+  const mcpLabel = "MCP server upstash";
   const skillPath = join(agent.skillDir(scope), SKILL_NAME);
   const skillLabel = `Skill ${SKILL_NAME}`;
 
@@ -233,7 +185,7 @@ async function setupMcp(
   }
 
   try {
-    const { path, replaced } = await writeMcpEntry(agent, scope, auth);
+    const { path, replaced } = await writeMcpEntry(agent, scope);
     steps.push({ label: `${mcpLabel}${replaced ? ", replaced existing entry" : ""}`, status: "done", path });
   } catch (err) {
     steps.push({ label: mcpLabel, status: "failed", detail: err instanceof Error ? err.message : String(err) });
@@ -253,16 +205,15 @@ async function setupMcp(
 interface AgentContext {
   mode: Mode;
   scope: Scope;
-  auth: McpAuth;
   dryRun: boolean;
   ref: string;
   repo: () => Promise<RepoFiles>;
 }
 
 async function setupAgent(name: AgentName, ctx: AgentContext): Promise<AgentResult> {
-  const { mode, scope, auth, dryRun, repo } = ctx;
+  const { mode, scope, dryRun, repo } = ctx;
   const agent = getAgent(name);
-  const choice = chooseMethod(name, mode, scope, auth);
+  const choice = chooseMethod(name, mode, scope, ctx.ref);
   const notes = choice.note ? [choice.note] : [];
 
   if (choice.method === "plugin" && agent.plugin) {
@@ -284,7 +235,7 @@ async function setupAgent(name: AgentName, ctx: AgentContext): Promise<AgentResu
   if (agent.plugin && (await isPluginInstalled(agent.plugin.kind))) {
     notes.push("The Upstash plugin is also installed and brings its own MCP server; uninstall one of the two to avoid duplicate tools.");
   }
-  const res = await setupMcp(name, scope, auth, dryRun, repo);
+  const res = await setupMcp(name, scope, dryRun, repo);
   return { agent: name, name: agent.displayName, method: "mcp", ok: res.ok, steps: res.steps, notes };
 }
 
@@ -298,9 +249,8 @@ export async function runSetup(cmd: Command): Promise<AgentResult[]> {
   const flags = cmd.optsWithGlobals() as SetupFlags;
   const mode = flags.mode as Mode;
   if (!["auto", "plugin", "mcp"].includes(mode)) throw plainError(`--mode must be auto, plugin, or mcp (got ${mode})`);
-  if (!["oauth", "api-key"].includes(flags.auth)) throw plainError(`--auth must be oauth or api-key (got ${flags.auth})`);
 
-  if (!isInteractive(flags)) return runPlain(cmd, flags, mode);
+  if (!isInteractive(flags)) return runPlain(flags, mode);
   try {
     return await runInteractive(cmd, flags, mode);
   } catch (err) {
@@ -311,21 +261,20 @@ export async function runSetup(cmd: Command): Promise<AgentResult[]> {
   }
 }
 
-async function runPlain(cmd: Command, flags: SetupFlags, mode: Mode): Promise<AgentResult[]> {
+async function runPlain(flags: SetupFlags, mode: Mode): Promise<AgentResult[]> {
   const scope: Scope = flags.project ? "project" : "global";
   const dryRun = Boolean(flags.dryRun);
-  const auth = resolveMcpAuth(flags, cmd);
   const agents = await resolveAgents(flags, scope);
-  const ctx: AgentContext = { mode, scope, auth, dryRun, ref: flags.ref, repo: lazyRepo(flags.ref) };
+  const ctx: AgentContext = { mode, scope, dryRun, ref: flags.ref, repo: lazyRepo(flags.ref) };
 
   const results: AgentResult[] = [];
   for (const name of agents) results.push(await setupAgent(name, ctx));
   if (results.some((r) => !r.ok)) process.exitCode = 1;
 
   if (flags.json) {
-    console.log(JSON.stringify({ scope, auth: auth.mode, dry_run: dryRun, results }, null, 2));
+    console.log(JSON.stringify({ scope, dry_run: dryRun, results }, null, 2));
   } else {
-    printSummary(results, scope, auth.mode, dryRun);
+    printSummary(results, scope, dryRun);
   }
   return results;
 }
@@ -337,12 +286,11 @@ async function runInteractive(cmd: Command, flags: SetupFlags, mode: Mode): Prom
   const scope = await promptScope(cmd);
   const agents = await promptAgents(flags, scope);
   if (agents.length === 0) throw noAgentsError("selected");
-  const auth = await promptAuth(flags, cmd);
 
   if (!dryRun) {
     const width = Math.max(...agents.map((n) => getAgent(n).displayName.length));
     const plan = agents.map((n) => {
-      const { method } = chooseMethod(n, mode, scope, auth);
+      const { method } = chooseMethod(n, mode, scope, flags.ref);
       const what = method === "plugin" ? "Upstash plugin" : `MCP server + ${SKILL_NAME} skill`;
       return `${getAgent(n).displayName.padEnd(width)}  ${ui.dim(what)}`;
     });
@@ -350,7 +298,7 @@ async function runInteractive(cmd: Command, flags: SetupFlags, mode: Mode): Prom
     if (!(await ui.confirm("Continue?"))) throw new ui.SetupCancelled();
   }
 
-  const ctx: AgentContext = { mode, scope, auth, dryRun, ref: flags.ref, repo: lazyRepo(flags.ref) };
+  const ctx: AgentContext = { mode, scope, dryRun, ref: flags.ref, repo: lazyRepo(flags.ref) };
   const results: AgentResult[] = [];
   for (const name of agents) {
     const label = getAgent(name).displayName;
@@ -372,13 +320,11 @@ async function runInteractive(cmd: Command, flags: SetupFlags, mode: Mode): Prom
   } else if (failed.length === results.length) {
     ui.outro("Setup failed. See the errors above.");
   } else {
-    const next = ["Restart your agents to pick up the changes."];
-    if (auth.mode === "oauth") {
-      next.push(
-        "On first use the Upstash MCP opens a browser consent page: pick the account,",
-        "and turn read-only off if the agent should create or change resources.",
-      );
-    }
+    const next = [
+      "Restart your agents to pick up the changes.",
+      "On first use the Upstash MCP opens a browser consent page: pick the account,",
+      "and turn read-only off if the agent should create or change resources.",
+    ];
     ui.note(next.join("\n"), "Next steps");
     ui.outro(
       failed.length > 0
@@ -391,10 +337,10 @@ async function runInteractive(cmd: Command, flags: SetupFlags, mode: Mode): Prom
 
 const ICON: Record<Step["status"], string> = { done: "+", planned: "~", failed: "x" };
 
-function printSummary(results: AgentResult[], scope: Scope, auth: AuthMode, dryRun: boolean): void {
+function printSummary(results: AgentResult[], scope: Scope, dryRun: boolean): void {
   const lines: string[] = [];
   const where = scope === "project" ? "this project" : "your user config";
-  lines.push(`${dryRun ? "Dry run: " : ""}Upstash setup for ${where} (${auth === "oauth" ? "OAuth" : "API key"})`, "");
+  lines.push(`${dryRun ? "Dry run: " : ""}Upstash setup for ${where}`, "");
   for (const r of results) {
     lines.push(`${r.name} · ${METHOD_LABEL[r.method]}`);
     for (const s of r.steps) {
@@ -405,12 +351,10 @@ function printSummary(results: AgentResult[], scope: Scope, auth: AuthMode, dryR
     lines.push("");
   }
   if (!dryRun && results.some((r) => r.ok)) {
-    lines.push("Restart your agents to pick up the changes.");
-    if (auth === "oauth") {
-      lines.push(
-        "On first use the Upstash MCP opens a browser consent page: pick the account, and turn read-only off if the agent should create or change resources.",
-      );
-    }
+    lines.push(
+      "Restart your agents to pick up the changes.",
+      "On first use the Upstash MCP opens a browser consent page: pick the account, and turn read-only off if the agent should create or change resources.",
+    );
   }
   console.log(lines.join("\n").trimEnd());
 }

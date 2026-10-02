@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Command } from "commander";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { registerSetup, setRunner } from "../../src/commands/setup.js";
 import { runCommand } from "../../src/setup/plugins.js";
-import { parseTar, stripTopDir } from "../../src/setup/repo.js";
+import { parseTar, stripTopDir, writeTree } from "../../src/setup/repo.js";
 import { setPromptIO } from "../../src/setup/ui.js";
-import { mergeServerEntry, upsertTomlTable, buildTomlTable } from "../../src/setup/mcp-config.js";
+import { mergeServerEntry, upsertTomlTable, buildTomlTable, stripJsonc } from "../../src/setup/mcp-config.js";
 
 // --- a tiny tar writer, so the fixtures need no binaries ---------------------
 
@@ -155,12 +155,34 @@ describe("config merging", () => {
   });
 
   it("appends a TOML table to a file that lacks it", () => {
-    const block = buildTomlTable("mcp_servers.upstash", { url: "u", http_headers: { Authorization: "Bearer t" } });
+    const block = buildTomlTable("mcp_servers.upstash", { url: "u" });
     const { content, replaced } = upsertTomlTable('model = "o3"\n', "mcp_servers.upstash", block);
     expect(replaced).toBe(false);
-    expect(content).toBe(
-      'model = "o3"\n\n[mcp_servers.upstash]\nurl = "u"\n\n[mcp_servers.upstash.http_headers]\nAuthorization = "Bearer t"\n',
+    expect(content).toBe('model = "o3"\n\n[mcp_servers.upstash]\nurl = "u"\n');
+  });
+
+  it("matches quoted TOML keys instead of declaring the table twice", () => {
+    const existing = '[mcp_servers."upstash"]  # added by hand\nurl = "old"\n\n[mcp_servers.\'upstash\'.http_headers]\nX = "1"\n\n[[profiles]]\nname = "a"\n';
+    const { content, replaced } = upsertTomlTable(existing, "mcp_servers.upstash", buildTomlTable("mcp_servers.upstash", { url: "new" }));
+    expect(replaced).toBe(true);
+    expect(content).toBe('[mcp_servers.upstash]\nurl = "new"\n\n[[profiles]]\nname = "a"\n');
+  });
+
+  it("reads JSONC with comments and trailing commas, leaving strings alone", () => {
+    const text = '{\n  // note\n  "a": "x, }",\n  "b": [1, 2,],\n  /* c */ "c": { "d": "//not a comment", },\n}';
+    expect(JSON.parse(stripJsonc(text))).toEqual({ a: "x, }", b: [1, 2], c: { d: "//not a comment" } });
+  });
+});
+
+describe("writeTree", () => {
+  it("keeps the previous install when an entry would escape the destination", async () => {
+    const dest = join(home, "skills", "upstash");
+    await writeTree(new Map([["SKILL.md", Buffer.from("v1")]]), dest);
+    await expect(writeTree(new Map([["SKILL.md", Buffer.from("v2")], ["../evil", Buffer.from("x")]]), dest)).rejects.toThrow(
+      /Refusing to write outside/,
     );
+    expect(readFileSync(join(dest, "SKILL.md"), "utf8")).toBe("v1");
+    expect(existsSync(join(home, "skills", "evil"))).toBe(false);
   });
 });
 
@@ -211,20 +233,34 @@ describe("setup", () => {
     expect(existsSync(join(home, ".codex", "config.toml"))).toBe(false);
   });
 
-  it("writes an API-key header when credentials are passed, bypassing OAuth-only plugins", async () => {
+  it("writes no credentials, and drops a key header left by an older setup", async () => {
     mkdirSync(join(home, ".codex"), { recursive: true });
-    writeFileSync(join(home, ".codex", "config.toml"), '[mcp_servers.other]\nurl = "y"\n');
-    const { results } = await runJson(["--codex", "--cursor", "--email", "me@x.com", "--api-key", "sk"]);
-    expect(results.map((r) => r.method)).toEqual(["mcp", "mcp"]);
-    expect(results[0]!.notes[0]).toContain("OAuth only");
-    expect(calls).toEqual([]);
-    expect(read(".codex", "config.toml")).toBe(
-      '[mcp_servers.other]\nurl = "y"\n\n[mcp_servers.upstash]\nurl = "https://mcp.upstash.com/mcp"\n\n[mcp_servers.upstash.http_headers]\nAuthorization = "Bearer me@x.com:sk"\n',
+    writeFileSync(
+      join(home, ".codex", "config.toml"),
+      '[mcp_servers.other]\nurl = "y"\n\n[mcp_servers.upstash]\nurl = "x"\n\n[mcp_servers.upstash.http_headers]\nAuthorization = "Bearer me@x.com:sk"\n',
     );
-    expect(readJson(".cursor", "mcp.json").mcpServers.upstash.headers).toEqual({ Authorization: "Bearer me@x.com:sk" });
-    if (process.platform !== "win32") {
-      expect(statSync(join(home, ".cursor", "mcp.json")).mode & 0o777).toBe(0o600);
-    }
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    writeFileSync(join(home, ".cursor", "mcp.json"), '{"mcpServers":{"upstash":{"url":"x","headers":{"Authorization":"Bearer k"}}}}');
+    const { results } = await runJson(["--codex", "--cursor", "--mode", "mcp", "--email", "me@x.com", "--api-key", "sk"]);
+    expect(results.every((r) => r.ok)).toBe(true);
+    expect(read(".codex", "config.toml")).toBe('[mcp_servers.other]\nurl = "y"\n\n[mcp_servers.upstash]\nurl = "https://mcp.upstash.com/mcp"\n');
+    expect(readJson(".cursor", "mcp.json").mcpServers.upstash).toEqual({ url: "https://mcp.upstash.com/mcp" });
+  });
+
+  it("has no --auth option", async () => {
+    await expect(run(["--claude", "--auth", "api-key"])).rejects.toThrow(/unknown option '--auth'/);
+  });
+
+  it("uses MCP + skill when --ref pins a branch the Claude and Codex plugins cannot install", async () => {
+    const { results } = await runJson(["--claude", "--codex", "--gemini", "--ref", "v2"]);
+    expect(results.map((r) => [r.agent, r.method])).toEqual([
+      ["claude", "mcp"],
+      ["codex", "mcp"],
+      ["gemini", "plugin"],
+    ]);
+    expect(results[0]!.notes[0]).toContain("from v2");
+    expect(calls).toContainEqual(["gemini", "extensions", "install", "https://github.com/upstash/skills", "--consent", "--ref", "v2"]);
+    expect(String(vi.mocked(fetch).mock.calls[0]![0])).toContain("/tar.gz/v2");
   });
 
   it("sets up detected agents with --yes", async () => {
@@ -307,30 +343,27 @@ describe("setup", () => {
       return screen;
     }
 
-    it("asks for scope, agents and auth, then sets up the picked agents", async () => {
+    it("asks for scope and agents, then sets up the picked agents", async () => {
       mkdirSync(join(home, ".cursor"));
-      // Scope: All projects. Agents: Cursor is pre-checked as detected; also tick OpenCode (7th row).
-      const screen = await interactive(
-        [],
-        [ENTER, DOWN.repeat(6) + SPACE + ENTER, ENTER, ENTER],
-      );
+      // Scope: All projects. Agents: Cursor is pre-checked as detected; also tick OpenCode (7th row). Confirm.
+      const screen = await interactive([], [ENTER, DOWN.repeat(6) + SPACE + ENTER, ENTER]);
       expect(screen).toContain("Which agents should use Upstash?");
       expect(screen).toContain("Connected 2 agents to Upstash.");
       expect(existsSync(join(home, ".cursor", "plugins", "local", "upstash", ".cursor-plugin", "plugin.json"))).toBe(true);
       expect(readJson(".config", "opencode", "opencode.json").mcp.upstash.url).toBe("https://mcp.upstash.com/mcp");
     });
 
-    it("skips questions answered by flags and prompts for missing API-key credentials", async () => {
+    it("skips questions answered by flags", async () => {
       process.chdir(home);
-      const screen = await interactive(["--codex", "--project"], [DOWN + ENTER, "me@x.com" + ENTER, "sk" + ENTER, ENTER]);
+      const screen = await interactive(["--codex", "--project"], [ENTER]);
       expect(screen).not.toContain("Where should Upstash be set up?");
       expect(screen).not.toContain("Which agents");
       expect(calls).toEqual([]);
-      expect(read(".codex", "config.toml")).toContain('Authorization = "Bearer me@x.com:sk"');
+      expect(read(".codex", "config.toml")).toBe('[mcp_servers.upstash]\nurl = "https://mcp.upstash.com/mcp"\n');
     });
 
     it("changes nothing when the plan is declined", async () => {
-      await interactive(["--opencode"], [ENTER, ENTER, DOWN + ENTER]);
+      await interactive(["--opencode"], [ENTER, DOWN + ENTER]);
       expect(process.exitCode).toBe(130);
       expect(existsSync(join(home, ".config"))).toBe(false);
     });

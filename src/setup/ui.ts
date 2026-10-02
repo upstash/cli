@@ -56,20 +56,10 @@ export async function confirm(message: string): Promise<boolean> {
   return answer(await p.confirm({ ...io, message, initialValue: true }));
 }
 
-export async function askText(message: string, opts: { placeholder?: string; secret?: boolean } = {}): Promise<string> {
-  const validate = (v: string | undefined): string | undefined => (v?.trim() ? undefined : "Required");
-  const value = opts.secret
-    ? await p.password({ ...io, message, validate })
-    : await p.text({ ...io, message, placeholder: opts.placeholder, validate });
-  return answer(value).trim();
-}
-
 export const intro = (title: string): void => p.intro(pc.bgCyan(pc.black(` ${title} `)), io);
 export const outro = (message: string): void => p.outro(message, io);
 export const cancelled = (message: string): void => p.cancel(message, io);
 export const note = (message: string, title: string): void => p.note(message, title, io);
-export const info = (message: string): void => p.log.info(message, io);
-export const warn = (message: string): void => p.log.warn(message, io);
 export const spinner = (): p.SpinnerResult => p.spinner(io);
 
 /** `/home/me/.cursor/mcp.json` → `~/.cursor/mcp.json`. */
@@ -118,5 +108,3 @@ export function printSteps(steps: Step[], notes: string[]): void {
 }
 
 export const dim = pc.dim;
-export const bold = pc.bold;
-export const cyan = pc.cyan;

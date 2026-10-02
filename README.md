@@ -33,7 +33,7 @@ It picks the best install path per agent:
 | Cursor | The Upstash plugin as a local plugin in `~/.cursor/plugins/local/upstash` |
 | VS Code, GitHub Copilot CLI, OpenCode | The remote MCP server in the agent's config, plus the `upstash` skill |
 
-In a terminal it walks you through a few prompts: where to install (all projects or just this one), which agents (detected ones are pre-selected), and how they sign in. Flags answer a question up front; `-y` or `--json` skip the prompts entirely.
+In a terminal it walks you through a few prompts: where to install (all projects or just this one) and which agents (detected ones are pre-selected). Flags answer a question up front; `-y` or `--json` skip the prompts entirely.
 
 Agents are detected from their config directories, or chosen with flags (`--claude --cursor ...`). If a plugin can't be installed (for example the agent's CLI isn't on your `PATH`), setup falls back to MCP + skill for that agent.
 
@@ -41,11 +41,10 @@ Agents are detected from their config directories, or chosen with flags (`--clau
 upstash setup --claude --cursor -y        # no prompts
 upstash setup --project                    # this repo instead of your user config
 upstash setup --mode mcp                   # MCP + skill everywhere, no plugins
-upstash setup --auth api-key               # API key header instead of OAuth (uses `upstash login` credentials)
 upstash setup --dry-run                    # show what would change
 ```
 
-The MCP server authenticates with OAuth by default: on first use your agent opens a consent page where you pick the account (turn read-only off if the agent should change resources). Plugins are OAuth-only, so `--auth api-key` writes MCP config instead. Rerunning `setup` updates what it installed.
+The MCP server signs in with OAuth: on first use your agent opens a consent page where you pick the account (turn read-only off if the agent should change resources). Setup never writes an API key into an agent's config. Rerunning `setup` updates what it installed.
 
 ## No account? Start with a free Redis
 

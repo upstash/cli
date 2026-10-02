@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { SKILLS_REPO } from "./agents.js";
@@ -99,19 +99,32 @@ export function subtree(files: RepoFiles, prefix: string): RepoFiles {
 
 /**
  * Replaces `dest` with exactly `files`, so files removed upstream do not linger.
- * `dest` is always a directory this CLI owns (named `upstash`).
+ * `dest` is always a directory this CLI owns (named `upstash`). Every path is
+ * checked and the tree is written to a staging directory first, so a bad
+ * archive or a failed write leaves the previous install in place.
  */
 export async function writeTree(files: RepoFiles, dest: string): Promise<number> {
   if (files.size === 0) throw new Error(`Nothing to install into ${dest}`);
-  await rm(dest, { recursive: true, force: true });
-  for (const [rel, content] of files) {
+  const entries = [...files].map(([rel, content]) => {
     const clean = normalize(rel);
     if (isAbsolute(clean) || clean === ".." || clean.startsWith(`..${sep}`)) {
       throw new Error(`Refusing to write outside ${dest}: ${rel}`);
     }
-    const target = join(dest, clean);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, content);
+    return [clean, content] as const;
+  });
+  const staging = `${dest}.tmp-${process.pid}`;
+  await rm(staging, { recursive: true, force: true });
+  try {
+    for (const [clean, content] of entries) {
+      const target = join(staging, clean);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, content);
+    }
+    await rm(dest, { recursive: true, force: true });
+    await rename(staging, dest);
+  } catch (err) {
+    await rm(staging, { recursive: true, force: true });
+    throw err;
   }
   return files.size;
 }

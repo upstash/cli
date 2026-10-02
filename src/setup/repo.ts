@@ -6,8 +6,6 @@ import { SKILLS_REPO } from "./agents.js";
 /** Repo-relative path → file contents. */
 export type RepoFiles = Map<string, Buffer>;
 
-const REF_PATTERN = /^[A-Za-z0-9._\/-]+$/;
-
 function cString(buf: Buffer, start: number, length: number): string {
   const slice = buf.subarray(start, start + length);
   const nul = slice.indexOf(0);
@@ -73,17 +71,17 @@ export function stripTopDir(files: RepoFiles): RepoFiles {
   return out;
 }
 
-export async function fetchSkillsRepo(ref: string): Promise<RepoFiles> {
-  if (!REF_PATTERN.test(ref)) throw new Error(`Invalid git ref: ${ref}`);
-  const url = `https://codeload.github.com/${SKILLS_REPO}/tar.gz/${ref}`;
+/** Downloads upstash/skills at its default branch. */
+export async function fetchSkillsRepo(): Promise<RepoFiles> {
+  const url = `https://codeload.github.com/${SKILLS_REPO}/tar.gz/main`;
   let res: Response;
   try {
     res = await fetch(url, { headers: { "User-Agent": "upstash/cli" } });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`Could not download ${SKILLS_REPO}@${ref}: ${reason}`);
+    throw new Error(`Could not download ${SKILLS_REPO}: ${reason}`);
   }
-  if (!res.ok) throw new Error(`Could not download ${SKILLS_REPO}@${ref}: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Could not download ${SKILLS_REPO}: HTTP ${res.status}`);
   return stripTopDir(parseTar(gunzipSync(Buffer.from(await res.arrayBuffer()))));
 }
 
@@ -100,8 +98,9 @@ export function subtree(files: RepoFiles, prefix: string): RepoFiles {
 /**
  * Replaces `dest` with exactly `files`, so files removed upstream do not linger.
  * `dest` is always a directory this CLI owns (named `upstash`). Every path is
- * checked and the tree is written to a staging directory first, so a bad
- * archive or a failed write leaves the previous install in place.
+ * checked and the tree is written to a staging directory first, then swapped
+ * in through a backup, so a bad archive or a failed write or rename leaves the
+ * previous install in place.
  */
 export async function writeTree(files: RepoFiles, dest: string): Promise<number> {
   if (files.size === 0) throw new Error(`Nothing to install into ${dest}`);
@@ -120,11 +119,28 @@ export async function writeTree(files: RepoFiles, dest: string): Promise<number>
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, content);
     }
-    await rm(dest, { recursive: true, force: true });
-    await rename(staging, dest);
   } catch (err) {
     await rm(staging, { recursive: true, force: true });
     throw err;
   }
+  // Swap through a backup so a failed rename can put the previous install back.
+  const backup = `${dest}.old-${process.pid}`;
+  await rm(backup, { recursive: true, force: true });
+  let hadPrevious = false;
+  try {
+    hadPrevious = await rename(dest, backup).then(
+      () => true,
+      (err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") return false;
+        throw err;
+      },
+    );
+    await rename(staging, dest);
+  } catch (err) {
+    if (hadPrevious) await rename(backup, dest);
+    await rm(staging, { recursive: true, force: true });
+    throw err;
+  }
+  if (hadPrevious) await rm(backup, { recursive: true, force: true });
   return files.size;
 }

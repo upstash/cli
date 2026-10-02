@@ -60,7 +60,6 @@ function planned(label: string): Step {
 
 export interface PluginContext {
   scope: Scope;
-  ref: string;
   dryRun: boolean;
   run: Runner;
   /** Lazily downloads upstash/skills; only the Cursor installer needs the files. */
@@ -132,13 +131,11 @@ function codex(ctx: PluginContext): Promise<PluginResult> {
   );
 }
 
-/** https://geminicli.com/docs/extensions/reference/#install-an-extension (`install --ref --consent`, `update <name>`) */
+/** https://geminicli.com/docs/extensions/reference/#install-an-extension (`install --consent`, `update <name>`) */
 async function gemini(ctx: PluginContext): Promise<PluginResult> {
   const label = "Extension upstash";
   if (ctx.dryRun) return { ok: true, steps: [planned(label)], notes: [] };
-  const args = ["extensions", "install", `https://github.com/${SKILLS_REPO}`, "--consent"];
-  if (ctx.ref !== "main") args.push("--ref", ctx.ref);
-  let res = await ctx.run("gemini", args);
+  let res = await ctx.run("gemini", ["extensions", "install", `https://github.com/${SKILLS_REPO}`, "--consent"]);
   if (res.missing) return { ok: false, missing: "gemini", steps: [], notes: [] };
   if (!res.ok && /already installed/i.test(res.output)) {
     res = await ctx.run("gemini", ["extensions", "update", "upstash"]);
@@ -175,7 +172,7 @@ async function cursor(ctx: PluginContext): Promise<PluginResult> {
       for (const [rel, content] of subtree(repo, dir)) files.set(`${dir}/${rel}`, content);
     }
     if (!files.has(".cursor-plugin/plugin.json")) {
-      throw new Error(`${SKILLS_REPO}@${ctx.ref} has no .cursor-plugin/plugin.json`);
+      throw new Error(`${SKILLS_REPO} has no .cursor-plugin/plugin.json`);
     }
     await writeTree(files, dest);
     return { ok: true, steps: [{ label, status: "done", path: dest }], notes };

@@ -116,18 +116,11 @@ export function buildTomlTable(table: string, entry: Record<string, unknown>): s
   return lines.join("\n") + "\n";
 }
 
-/**
- * The dotted keys of a TOML table header, with quotes resolved, so
- * `[mcp_servers."upstash"]  # note` reads as ["mcp_servers", "upstash"].
- * Undefined for any line that is not a `[table]` header.
- */
-function tableKeys(line: string): string[] | undefined {
-  const m = /^\s*\[(?!\[)(.+)\]\s*(?:#.*)?$/.exec(line);
-  if (!m) return undefined;
+/** Splits a dotted TOML key (`mcp_servers."upstash"`) into its parts, or undefined if it is not one. */
+function parseKeys(body: string): string[] | undefined {
   const keys: string[] = [];
   const re = /\s*("(?:[^"\\]|\\.)*"|'[^']*'|[A-Za-z0-9_-]+)\s*(\.|$)/y;
   let pos = 0;
-  const body = m[1]!;
   while (pos < body.length) {
     re.lastIndex = pos;
     const k = re.exec(body);
@@ -137,7 +130,50 @@ function tableKeys(line: string): string[] | undefined {
     pos = re.lastIndex;
     if (!k[2]) break;
   }
-  return pos >= body.length ? keys : undefined;
+  return pos >= body.length && keys.length > 0 ? keys : undefined;
+}
+
+/**
+ * The dotted keys of a TOML table header, with quotes resolved, so
+ * `[mcp_servers."upstash"]  # note` reads as ["mcp_servers", "upstash"].
+ * Undefined for any line that is not a `[table]` header.
+ */
+function tableKeys(line: string): string[] | undefined {
+  const m = /^\s*\[(?!\[)(.+)\]\s*(?:#.*)?$/.exec(line);
+  return m ? parseKeys(m[1]!) : undefined;
+}
+
+const startsWith = (keys: string[], prefix: string[]): boolean =>
+  keys.length >= prefix.length && prefix.every((k, i) => keys[i] === k);
+
+/**
+ * Whether `table` is defined anywhere other than its own `[table]` section:
+ * as a dotted key (`mcp_servers.upstash.url = ...`) or an inline table
+ * (`upstash = { ... }` under `[mcp_servers]`). Appending a `[table]` header
+ * then would declare it twice and break the whole file.
+ */
+function definedOutsideTable(lines: string[], table: string): boolean {
+  const want = table.split(".");
+  let current: string[] = [];
+  let inMultiline = false;
+  for (const line of lines) {
+    const quotes = (line.match(/"""|'''/g) ?? []).length;
+    if (inMultiline) {
+      if (quotes % 2 === 1) inMultiline = false;
+      continue;
+    }
+    const array = /^\s*\[\[(.+)\]\]\s*(?:#.*)?$/.exec(line);
+    const header = array ? parseKeys(array[1]!) : tableKeys(line);
+    if (header) {
+      current = header;
+      continue;
+    }
+    const kv = /^\s*([^=#\s][^=]*?)\s*=/.exec(line);
+    const keys = kv ? parseKeys(kv[1]!) : undefined;
+    if (keys && !startsWith(current, want) && startsWith([...current, ...keys], want)) return true;
+    if (quotes % 2 === 1) inMultiline = true;
+  }
+  return false;
 }
 
 const isTableHeader = (line: string): boolean => /^\s*\[/.test(line) && (tableKeys(line) !== undefined || /^\s*\[\[/.test(line));
@@ -151,16 +187,23 @@ function isHeader(line: string, table: string): boolean {
 function isSubTable(line: string, table: string): boolean {
   const keys = tableKeys(line);
   const want = table.split(".");
-  return keys !== undefined && keys.length > want.length && want.every((k, i) => keys[i] === k);
+  return keys !== undefined && keys.length > want.length && startsWith(keys, want);
 }
 
-/** Replaces `[table]` and its `[table.*]` sub-tables, or appends the block. */
+/**
+ * Replaces `[table]` and its `[table.*]` sub-tables, or appends the block.
+ * Throws when the table is also defined inline or with dotted keys, which
+ * this line-based merge cannot rewrite safely.
+ */
 export function upsertTomlTable(
   existing: string,
   table: string,
   block: string,
 ): { content: string; replaced: boolean } {
   const lines = existing.split("\n");
+  if (definedOutsideTable(lines, table)) {
+    throw new Error(`${table} is defined inline or with dotted keys; replace it with a [${table}] table or remove it, then rerun`);
+  }
   const start = lines.findIndex((l) => isHeader(l, table));
   if (start === -1) {
     const base = existing.trimEnd();
@@ -206,7 +249,11 @@ export async function writeMcpEntry(
 
   if (agent.mcp.format === "toml") {
     const block = buildTomlTable(`${agent.mcp.configKey}.${SERVER_NAME}`, entry);
-    ({ content, replaced } = upsertTomlTable(await readText(path), `${agent.mcp.configKey}.${SERVER_NAME}`, block));
+    try {
+      ({ content, replaced } = upsertTomlTable(await readText(path), `${agent.mcp.configKey}.${SERVER_NAME}`, block));
+    } catch (err) {
+      throw new Error(`${path}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   } else {
     const merged = mergeServerEntry(await readJsonConfig(path), agent.mcp.configKey, SERVER_NAME, entry);
     content = JSON.stringify(merged.config, null, 2) + "\n";
@@ -223,7 +270,12 @@ export async function hasMcpEntry(agent: AgentConfig, scope: Scope): Promise<str
   const path = await resolveMcpPath(agent, scope);
   if (agent.mcp.format === "toml") {
     const table = `${agent.mcp.configKey}.${SERVER_NAME}`;
-    return (await readText(path)).split("\n").some((l) => isHeader(l, table)) ? path : undefined;
+    try {
+      const lines = (await readText(path)).split("\n");
+      return lines.some((l) => isHeader(l, table)) || definedOutsideTable(lines, table) ? path : undefined;
+    } catch {
+      return undefined;
+    }
   }
   try {
     const section = (await readJsonConfig(path))[agent.mcp.configKey];

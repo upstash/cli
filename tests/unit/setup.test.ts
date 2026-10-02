@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Command } from "commander";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -83,7 +83,7 @@ async function run(argv: string[]): Promise<string> {
   return out.join("\n");
 }
 
-async function runJson(argv: string[]): Promise<{ results: Array<{ agent: string; method: string; ok: boolean; notes: string[] }> }> {
+async function runJson(argv: string[]): Promise<{ results: Array<{ agent: string; method: string; ok: boolean; notes: string[]; steps: Array<{ detail?: string }> }> }> {
   return JSON.parse(await run([...argv, "--json"]));
 }
 
@@ -168,6 +168,20 @@ describe("config merging", () => {
     expect(content).toBe('[mcp_servers.upstash]\nurl = "new"\n\n[[profiles]]\nname = "a"\n');
   });
 
+  it("detects inline and dotted definitions outside the table's own section", () => {
+    const block = buildTomlTable("mcp_servers.upstash", { url: "new" });
+    for (const existing of [
+      'mcp_servers.upstash = { url = "x" }\n',
+      'mcp_servers.upstash.url = "x"\n',
+      '[mcp_servers]\n"upstash" = { url = "x" }\n',
+    ]) {
+      expect(() => upsertTomlTable(existing, "mcp_servers.upstash", block)).toThrow(/defined inline/);
+    }
+    // Dotted keys inside the table's own section, other servers, and text inside a multi-line string are fine.
+    const ok = '[mcp_servers.upstash]\nurl = "old"\nhttp_headers.X = "1"\n\n[mcp_servers]\nother = { url = "y" }\n\n[notes]\ntext = """\nmcp_servers.upstash = 1\n"""\n';
+    expect(upsertTomlTable(ok, "mcp_servers.upstash", block).replaced).toBe(true);
+  });
+
   it("reads JSONC with comments and trailing commas, leaving strings alone", () => {
     const text = '{\n  // note\n  "a": "x, }",\n  "b": [1, 2,],\n  /* c */ "c": { "d": "//not a comment", },\n}';
     expect(JSON.parse(stripJsonc(text))).toEqual({ a: "x, }", b: [1, 2], c: { d: "//not a comment" } });
@@ -183,6 +197,14 @@ describe("writeTree", () => {
     );
     expect(readFileSync(join(dest, "SKILL.md"), "utf8")).toBe("v1");
     expect(existsSync(join(home, "skills", "evil"))).toBe(false);
+  });
+
+  it("swaps in a new tree and leaves no staging or backup directories", async () => {
+    const dest = join(home, "skills", "upstash");
+    await writeTree(new Map([["old.md", Buffer.from("v1")]]), dest);
+    await writeTree(new Map([["new.md", Buffer.from("v2")]]), dest);
+    expect(readdirSync(dest)).toEqual(["new.md"]);
+    expect(readdirSync(join(home, "skills"))).toEqual(["upstash"]);
   });
 });
 
@@ -251,16 +273,19 @@ describe("setup", () => {
     await expect(run(["--claude", "--auth", "api-key"])).rejects.toThrow(/unknown option '--auth'/);
   });
 
-  it("uses MCP + skill when --ref pins a branch the Claude and Codex plugins cannot install", async () => {
-    const { results } = await runJson(["--claude", "--codex", "--gemini", "--ref", "v2"]);
-    expect(results.map((r) => [r.agent, r.method])).toEqual([
-      ["claude", "mcp"],
-      ["codex", "mcp"],
-      ["gemini", "plugin"],
-    ]);
-    expect(results[0]!.notes[0]).toContain("from v2");
-    expect(calls).toContainEqual(["gemini", "extensions", "install", "https://github.com/upstash/skills", "--consent", "--ref", "v2"]);
-    expect(String(vi.mocked(fetch).mock.calls[0]![0])).toContain("/tar.gz/v2");
+  it("has no --ref option", async () => {
+    await expect(run(["--gemini", "--ref", "v2"])).rejects.toThrow(/unknown option '--ref'/);
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses to append a second upstash table when Codex defines it inline", async () => {
+    mkdirSync(join(home, ".codex"), { recursive: true });
+    const config = '[mcp_servers]\nupstash = { url = "x" }\n';
+    writeFileSync(join(home, ".codex", "config.toml"), config);
+    const { results } = await runJson(["--codex", "--mode", "mcp"]);
+    expect(results[0]!.ok).toBe(false);
+    expect(results[0]!.steps[0]!.detail).toMatch(/defined inline or with dotted keys/);
+    expect(read(".codex", "config.toml")).toBe(config);
   });
 
   it("sets up detected agents with --yes", async () => {

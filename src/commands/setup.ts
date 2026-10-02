@@ -5,7 +5,6 @@ import { plainError } from "../output.js";
 import {
   AGENT_NAMES,
   SKILL_NAME,
-  SKILLS_REPO,
   getAgent,
   type AgentName,
   type Scope,
@@ -22,7 +21,6 @@ interface SetupFlags extends Partial<Record<AgentName, boolean>> {
   mode: string;
   project?: boolean;
   yes?: boolean;
-  ref: string;
   dryRun?: boolean;
   json?: boolean;
 }
@@ -57,7 +55,6 @@ export function registerSetup(program: Command): void {
     .option("--mode <mode>", "auto (plugin where supported, else MCP + skill), plugin, or mcp", "auto")
     .option("-p, --project", "Configure the current project instead of your user config")
     .option("-y, --yes", "Do not prompt; without agent flags, set up every detected agent")
-    .option("--ref <ref>", `Git ref of ${SKILLS_REPO} to install from`, "main")
     .option("--dry-run", "Show what would change without writing anything")
     .option("--json", "Print the result as JSON")
     .action(async (_flags: unknown, cmd: Command) => {
@@ -147,7 +144,6 @@ function chooseMethod(
   name: AgentName,
   mode: Mode,
   scope: Scope,
-  ref: string,
 ): { method: Method; note?: string } {
   const plugin = getAgent(name).plugin;
   if (mode === "mcp") return { method: "mcp" };
@@ -158,10 +154,6 @@ function chooseMethod(
   }
   if (!plugin.scopes.includes(scope)) {
     return { method: "mcp", note: "Plugins install per user, not per project; wrote project-level MCP + skill instead." };
-  }
-  // Claude Code and Codex install from the marketplace's default branch, so they cannot pin a ref.
-  if (ref !== "main" && (plugin.kind === "claude" || plugin.kind === "codex")) {
-    return { method: "mcp", note: `The plugin installs from the marketplace's default branch; installed MCP + skill from ${ref} instead.` };
   }
   return { method: "plugin" };
 }
@@ -206,18 +198,17 @@ interface AgentContext {
   mode: Mode;
   scope: Scope;
   dryRun: boolean;
-  ref: string;
   repo: () => Promise<RepoFiles>;
 }
 
 async function setupAgent(name: AgentName, ctx: AgentContext): Promise<AgentResult> {
   const { mode, scope, dryRun, repo } = ctx;
   const agent = getAgent(name);
-  const choice = chooseMethod(name, mode, scope, ctx.ref);
+  const choice = chooseMethod(name, mode, scope);
   const notes = choice.note ? [choice.note] : [];
 
   if (choice.method === "plugin" && agent.plugin) {
-    const res = await installPlugin(agent.plugin.kind, { scope, ref: ctx.ref, dryRun, run: runner, repo });
+    const res = await installPlugin(agent.plugin.kind, { scope, dryRun, run: runner, repo });
     if (res.ok || mode === "plugin") {
       if (res.missing) notes.push(`\`${res.missing}\` not found on PATH.`);
       const manual = res.ok ? await hasMcpEntry(agent, scope) : undefined;
@@ -240,9 +231,9 @@ async function setupAgent(name: AgentName, ctx: AgentContext): Promise<AgentResu
 }
 
 /** One download serves every agent that needs files. */
-function lazyRepo(ref: string): () => Promise<RepoFiles> {
+function lazyRepo(): () => Promise<RepoFiles> {
   let repoPromise: Promise<RepoFiles> | undefined;
-  return () => (repoPromise ??= fetchSkillsRepo(ref));
+  return () => (repoPromise ??= fetchSkillsRepo());
 }
 
 export async function runSetup(cmd: Command): Promise<AgentResult[]> {
@@ -265,7 +256,7 @@ async function runPlain(flags: SetupFlags, mode: Mode): Promise<AgentResult[]> {
   const scope: Scope = flags.project ? "project" : "global";
   const dryRun = Boolean(flags.dryRun);
   const agents = await resolveAgents(flags, scope);
-  const ctx: AgentContext = { mode, scope, dryRun, ref: flags.ref, repo: lazyRepo(flags.ref) };
+  const ctx: AgentContext = { mode, scope, dryRun, repo: lazyRepo() };
 
   const results: AgentResult[] = [];
   for (const name of agents) results.push(await setupAgent(name, ctx));
@@ -290,7 +281,7 @@ async function runInteractive(cmd: Command, flags: SetupFlags, mode: Mode): Prom
   if (!dryRun) {
     const width = Math.max(...agents.map((n) => getAgent(n).displayName.length));
     const plan = agents.map((n) => {
-      const { method } = chooseMethod(n, mode, scope, flags.ref);
+      const { method } = chooseMethod(n, mode, scope);
       const what = method === "plugin" ? "Upstash plugin" : `MCP server + ${SKILL_NAME} skill`;
       return `${getAgent(n).displayName.padEnd(width)}  ${ui.dim(what)}`;
     });
@@ -298,7 +289,7 @@ async function runInteractive(cmd: Command, flags: SetupFlags, mode: Mode): Prom
     if (!(await ui.confirm("Continue?"))) throw new ui.SetupCancelled();
   }
 
-  const ctx: AgentContext = { mode, scope, dryRun, ref: flags.ref, repo: lazyRepo(flags.ref) };
+  const ctx: AgentContext = { mode, scope, dryRun, repo: lazyRepo() };
   const results: AgentResult[] = [];
   for (const name of agents) {
     const label = getAgent(name).displayName;

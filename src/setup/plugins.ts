@@ -97,6 +97,7 @@ async function viaCli(
   return { ok: res.ok, steps, notes: [] };
 }
 
+/** https://code.claude.com/docs/en/plugins/cli-reference (`marketplace add`, `marketplace update`, `install`, `update`) */
 async function claude(ctx: PluginContext): Promise<PluginResult> {
   const scope = ctx.scope === "project" ? "project" : "user";
   const result = await viaCli(
@@ -114,6 +115,10 @@ async function claude(ctx: PluginContext): Promise<PluginResult> {
   return result;
 }
 
+/**
+ * https://developers.openai.com/codex/cli/reference#codex-plugin-marketplace (`marketplace add`, `marketplace upgrade`)
+ * https://developers.openai.com/codex/cli/reference#codex-plugin (`plugin add`)
+ */
 function codex(ctx: PluginContext): Promise<PluginResult> {
   return viaCli(
     ctx,
@@ -127,6 +132,7 @@ function codex(ctx: PluginContext): Promise<PluginResult> {
   );
 }
 
+/** https://geminicli.com/docs/extensions/reference/#install-an-extension (`install --ref --consent`, `update <name>`) */
 async function gemini(ctx: PluginContext): Promise<PluginResult> {
   const label = "Extension upstash";
   if (ctx.dryRun) return { ok: true, steps: [planned(label)], notes: [] };
@@ -152,6 +158,10 @@ export function cursorPluginDir(): string {
  * Cursor has no plugin CLI, and the Upstash plugin is not in its marketplace
  * yet, so this installs it as a local plugin: the same manifest, skills and
  * assets the marketplace would fetch, under ~/.cursor/plugins/local/.
+ * The manifest declares the MCP server inline (`mcpServers` in plugin.json), so
+ * the plugin brings the server along with the skills.
+ * https://cursor.com/docs/plugins#test-plugins-locally
+ * https://cursor.com/docs/reference/plugins#mcp-servers
  */
 async function cursor(ctx: PluginContext): Promise<PluginResult> {
   const dest = cursorPluginDir();
@@ -194,7 +204,11 @@ async function fileIncludes(path: string, needle: string): Promise<boolean> {
   }
 }
 
-/** Best-effort check for a user-level Upstash plugin, to warn about a second MCP server. */
+/**
+ * Best-effort check for a user-level Upstash plugin, to warn about a second MCP server.
+ * Claude records installs in installed_plugins.json: https://code.claude.com/docs/en/plugins/loading#find-plugins-on-disk
+ * Gemini loads extensions from ~/.gemini/extensions: https://geminicli.com/docs/extensions/reference/#extension-format
+ */
 export async function isPluginInstalled(kind: PluginKind): Promise<boolean> {
   const claudeDir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
   switch (kind) {

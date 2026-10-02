@@ -36,15 +36,21 @@ const cwd = (...parts: string[]): string => join(process.cwd(), ...parts);
 const pick = (scope: Scope, project: string, global: string): string =>
   scope === "project" ? cwd(project) : global;
 
+/** https://code.claude.com/docs/en/env-vars (`CLAUDE_CONFIG_DIR`) */
 function claudeConfigDir(): string {
   return process.env.CLAUDE_CONFIG_DIR || home(".claude");
 }
 
+/**
+ * The docs do not say where `.claude.json` goes under `CLAUDE_CONFIG_DIR`;
+ * `claude mcp add --scope user` (v2.1.287) writes `$CLAUDE_CONFIG_DIR/.claude.json`.
+ */
 function claudeGlobalMcpPath(): string {
   const dir = process.env.CLAUDE_CONFIG_DIR;
   return dir ? join(dir, ".claude.json") : home(".claude.json");
 }
 
+/** https://code.visualstudio.com/docs/configure/settings#_settings-file-locations */
 export function vscodeUserDir(platform: NodeJS.Platform = process.platform): string {
   if (platform === "win32") {
     return join(process.env.APPDATA || home("AppData", "Roaming"), "Code", "User");
@@ -67,9 +73,20 @@ function withAuth(
   return { ...entry, [key]: { Authorization: `Bearer ${auth.token}` } };
 }
 
+/** Only `opencode.json` / `opencode.jsonc` are documented; the dotted names are accepted for older setups. */
 const OPENCODE_FILES = ["opencode.json", "opencode.jsonc", ".opencode.json", ".opencode.jsonc"];
 
+/**
+ * Where each agent keeps its MCP config and skills. Every entry links the
+ * vendor docs its paths and entry shape come from; check them when an agent
+ * changes its layout.
+ */
 export const AGENTS = {
+  /**
+   * MCP: https://code.claude.com/docs/en/mcp (user scope: ~/.claude.json, project scope: .mcp.json, `type: "http"` + `headers`)
+   * Skills: https://code.claude.com/docs/en/skills
+   * Plugins: https://code.claude.com/docs/en/plugins/cli-reference
+   */
   claude: {
     displayName: "Claude Code",
     plugin: { kind: "claude", scopes: ["global", "project"] },
@@ -82,6 +99,12 @@ export const AGENTS = {
     skillDir: (s) => pick(s, join(".claude", "skills"), join(claudeConfigDir(), "skills")),
     detect: (s) => (s === "project" ? [cwd(".mcp.json"), cwd(".claude")] : [claudeConfigDir()]),
   },
+  /**
+   * MCP: https://developers.openai.com/codex/mcp#configure-with-configtoml (`[mcp_servers.<name>]`, `url`, `http_headers`;
+   * project .codex/config.toml loads only in trusted projects)
+   * Skills: https://developers.openai.com/codex/skills (~/.agents/skills, .agents/skills)
+   * Plugins: https://developers.openai.com/codex/cli/reference#codex-plugin
+   */
   codex: {
     displayName: "Codex",
     plugin: { kind: "codex", scopes: ["global"] },
@@ -94,6 +117,11 @@ export const AGENTS = {
     skillDir: (s) => pick(s, join(".agents", "skills"), home(".agents", "skills")),
     detect: (s) => [pick(s, ".codex", home(".codex"))],
   },
+  /**
+   * MCP: https://cursor.com/docs/context/mcp#configuration-locations (~/.cursor/mcp.json, .cursor/mcp.json)
+   * Skills: https://cursor.com/docs/context/skills#skill-directories
+   * Plugins: https://cursor.com/docs/plugins#test-plugins-locally
+   */
   cursor: {
     displayName: "Cursor",
     plugin: { kind: "cursor", scopes: ["global"] },
@@ -106,6 +134,12 @@ export const AGENTS = {
     skillDir: (s) => pick(s, join(".cursor", "skills"), home(".cursor", "skills")),
     detect: (s) => [pick(s, ".cursor", home(".cursor"))],
   },
+  /**
+   * MCP: https://geminicli.com/docs/tools/mcp-server/#configuration-properties (`mcpServers`, `httpUrl`, `headers`)
+   * Settings files: https://geminicli.com/docs/reference/configuration/#settings-files
+   * Skills: https://geminicli.com/docs/cli/skills/#discovery-tiers
+   * Extensions: https://geminicli.com/docs/extensions/reference/#install-an-extension
+   */
   gemini: {
     displayName: "Gemini CLI",
     plugin: { kind: "gemini", scopes: ["global"] },
@@ -118,6 +152,13 @@ export const AGENTS = {
     skillDir: (s) => pick(s, join(".gemini", "skills"), home(".gemini", "skills")),
     detect: (s) => [pick(s, ".gemini", home(".gemini"))],
   },
+  /**
+   * MCP: https://code.visualstudio.com/docs/agents/reference/mcp-configuration#_configuration-file (top-level `servers`)
+   * These docs now list .vscode/mcp.json and the user-profile mcp.json as deprecated in favour of
+   * .mcp.json and ~/.copilot/mcp-config.json; VS Code still reads them:
+   * https://code.visualstudio.com/docs/agent-customization/mcp-servers#_configure-the-mcpjson-file
+   * Skills: https://code.visualstudio.com/docs/agent-customization/agent-skills
+   */
   vscode: {
     displayName: "VS Code",
     mcp: {
@@ -129,6 +170,11 @@ export const AGENTS = {
     skillDir: (s) => pick(s, join(".agents", "skills"), home(".agents", "skills")),
     detect: (s) => [pick(s, ".vscode", vscodeUserDir())],
   },
+  /**
+   * MCP: https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+   * (~/.copilot/mcp-config.json, project .mcp.json, `tools: ["*"]`)
+   * Skills: https://docs.github.com/en/copilot/concepts/agents/about-agent-skills
+   */
   copilot: {
     displayName: "GitHub Copilot CLI",
     mcp: {
@@ -142,6 +188,11 @@ export const AGENTS = {
     // attributed to it; --copilot still works explicitly.
     detect: (s) => (s === "project" ? [] : [home(".copilot")]),
   },
+  /**
+   * Config files: https://opencode.ai/docs/config#locations
+   * MCP: https://opencode.ai/docs/mcp-servers#remote (`mcp`, `type: "remote"`)
+   * Skills: https://opencode.ai/docs/skills#place-files
+   */
   opencode: {
     displayName: "OpenCode",
     mcp: {

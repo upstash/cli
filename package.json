@@ -25,7 +25,7 @@
   "author": "Upstash",
   "license": "MIT",
   "dependencies": {
-    "@upstash/blob": "0.0.5",
+    "@upstash/blob": "0.0.7",
     "commander": "^13.0.0",
     "dotenv": "^16.4.5",
     "mime": "4.1.0"

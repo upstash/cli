@@ -14,6 +14,7 @@ import { registerStartRedis } from "./commands/start-redis.js";
 import { registerTelemetry } from "./commands/telemetry.js";
 import { registerSetup } from "./commands/setup.js";
 import { handleError } from "./output.js";
+import { withDefaultCommand } from "./default-command.js";
 import dotenv from "dotenv";
 
 // Pre-scan argv for --env-path before Commander parses, so dotenv loads
@@ -53,4 +54,6 @@ registerSearch(program);
 registerQStash(program);
 registerBlob(program);
 
-program.parseAsync().catch(handleError);
+const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+const args = withDefaultCommand(process.argv.slice(2), interactive);
+program.parseAsync(args, { from: "user" }).catch(handleError);

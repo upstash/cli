@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { resolveAuth } from "../../auth.js";
 import { HttpError, request } from "../../client.js";
 import { printJSON } from "../../output.js";
@@ -10,6 +10,7 @@ import {
   sleep,
 } from "./retry.js";
 import type { Sleep } from "./retry.js";
+import { bucketIdArgument } from "./buckets.js";
 
 const BLOB_CREDENTIALS_URL = "https://blob.upstash.io/v1/credentials";
 const RETRYABLE_STATUSES = new Set([429, 503]);
@@ -155,10 +156,18 @@ interface BucketTokenSource {
   unauthorizedRetries: number;
 }
 
-function resolveBucketToken(
-  flags: { bucketId?: string },
+export function resolveBucketToken(
+  flags: { bucketId?: string; token?: string },
   command: Command,
 ): Promise<BucketTokenSource> {
+  if (flags.token !== undefined) {
+    if (flags.bucketId !== undefined) {
+      return Promise.reject(new Error("Use either --token or a bucket, not both"));
+    }
+    const token = flags.token.trim();
+    if (!token) return Promise.reject(new Error("--token must be a non-empty Blob bucket token"));
+    return Promise.resolve({ token, unauthorizedRetries: 0 });
+  }
   if (flags.bucketId) {
     const auth = resolveAuth(command);
     return request<BlobBucket>(auth, "GET", `/v2/blob/bucket/${flags.bucketId}`).then((bucket) => {
@@ -179,27 +188,31 @@ function resolveBucketToken(
 
   return Promise.reject(
     new Error(
-      "Blob credentials require either --bucket-id with Upstash account authentication or a non-empty UPSTASH_BLOB_TOKEN environment variable",
+      "Name a bucket (with Upstash account authentication), or provide --token or UPSTASH_BLOB_TOKEN in the environment or .env",
     ),
   );
 }
 
 export function registerBlobCredentials(blob: Command): void {
   blob
-    .command("credentials")
+    .command("credentials [bucket]")
     .description(
       "Get temporary S3 credentials for a Blob bucket; expiresAt is the credential expiry",
     )
-    .option("--bucket-id <id>", "Blob bucket ID")
+    .addOption(new Option("--bucket-id <id>").hideHelp())
+    .option("--token <token>", "Blob bucket token; no management API key needed (overrides UPSTASH_BLOB_TOKEN)")
     .addHelpText(
       "after",
       `
-With --bucket-id, a bucket created in the last few minutes is polled for up
+With a bucket name or id, a bucket created in the last few minutes is polled for up
 to ~30s until provisioning finishes, so it is safe to run right after create.
 `,
     )
-    .action(async (flags: { bucketId?: string }, command: Command) => {
-      const source = await resolveBucketToken(flags, command);
+    .action(async (name: string | undefined, flags: { bucketId?: string; token?: string }, command: Command) => {
+      const named = name !== undefined || flags.bucketId !== undefined;
+      if (named && flags.token !== undefined) throw new Error("Use either --token or a bucket, not both");
+      const bucketId = named ? await bucketIdArgument(command, name, flags) : undefined;
+      const source = await resolveBucketToken({ token: flags.token, bucketId }, command);
       const credentials = await fetchBlobCredentials(source.token, sleep, {
         unauthorizedRetries: source.unauthorizedRetries,
       });

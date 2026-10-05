@@ -7,6 +7,8 @@ Agent-friendly CLI for managing & debugging Upstash resources from your terminal
 
 ## Installation
 
+Requires Node.js 20 or newer.
+
 ```bash
 npm i -g @upstash/cli
 ```
@@ -97,8 +99,11 @@ upstash qstash stats --qstash-id $QSTASH_ID --period 7d
 
 # Blob
 upstash blob create --name my-bucket --visibility private
-upstash blob list
-upstash blob credentials --bucket-id $BUCKET_ID
+upstash blob ls
+upstash blob ls my-bucket
+upstash blob cp ./assets blob://my-bucket/assets -r
+upstash blob sync ./site blob://my-bucket/site -d
+upstash blob credentials my-bucket
 
 # Team
 upstash team list
@@ -106,6 +111,61 @@ upstash team add-member --team-id $TEAM_ID --member-email you@example.com --role
 ```
 
 Run `upstash --help` (or `--help` on any subcommand) to discover everything else, and check the [full docs](https://upstash.com/docs/agent-resources/cli) for the complete catalog. `upstash blob credentials` returns temporary S3 credentials for use with AWS CLI, rclone, or an S3 SDK.
+
+## Working with Blob buckets and objects
+
+The object commands mirror `aws s3`, with `blob://<bucket>/<key>` in place of
+`s3://`. `<bucket>` is a bucket name or id.
+
+```bash
+upstash blob ls                                         # buckets
+upstash blob ls my-bucket/images/                       # one level; -r for all
+upstash blob cp ./photo.png blob://my-bucket/images/
+upstash blob cp ./assets blob://my-bucket/assets -r
+upstash blob cp blob://my-bucket/images ./images -r --exclude "*.tmp"
+upstash blob cp blob://my-bucket/config.json - | jq .
+upstash blob mv blob://my-bucket/a.txt blob://other-bucket/a.txt
+upstash blob sync ./site blob://my-bucket/site -d
+upstash blob rm my-bucket/tmp -r -n
+upstash blob presign my-bucket/report.pdf --expires-in 600
+upstash blob mb blob://new-bucket
+upstash blob rb new-bucket -f
+```
+
+`cp`, `mv` and `sync` need `blob://` to tell bucket paths from local ones. The
+commands that only take bucket paths (`ls`, `rm`, `presign`, `mb`, `rb`) accept
+`my-bucket/key` without it, as do `get`, `delete` and `credentials`, which take a
+bucket name or id.
+
+Flags follow `aws s3`: `-r/--recursive`, `--exclude`/`--include` (applied in
+order, last match wins), `-n/--dryrun`, `-d/--delete`, `--size-only`,
+`--exact-timestamps`, `--content-type`, `--cache-control`, `--metadata`,
+`--expected-size`, `--concurrency` and `-q/--quiet`. Copies between buckets reset
+Cache-Control to the default unless `--cache-control` is given. Local symbolic
+links are followed unless `--no-follow-symlinks` is given. Nothing is deleted
+through a link to a directory: `mv` refuses such files and `sync -d` keeps them.
+
+Progress goes to stderr and a JSON summary to stdout. Transfers retry transient
+failures, keep going past a failed file, and exit unsuccessfully at the end. Large
+files use multipart uploads, and the Blob SDK refreshes temporary S3 credentials
+throughout, even between parts of one file.
+
+### Using a bucket token instead of a login
+
+Bucket names need an Upstash login. A Blob bucket token (`--token`, or
+`UPSTASH_BLOB_TOKEN` in the environment or `.env`) works without one, but only for
+its own bucket, addressed by id. A token is never used for a bucket it wasn't
+issued for.
+
+```bash
+upstash blob cp ./assets blob://$BUCKET_ID/assets -r --token "$BLOB_TOKEN"
+upstash --env-path ./uploads.env blob sync ./assets blob://$BUCKET_ID/assets
+upstash blob credentials --token "$BLOB_TOKEN"
+```
+
+`--token` and `UPSTASH_BLOB_TOKEN` are each used only for their own bucket, so they
+can point at different buckets. Exported environment variables take precedence
+over values loaded from `.env` or `--env-path`.
 
 ## Telemetry
 

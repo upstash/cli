@@ -9,7 +9,7 @@ import { registerSetup, setRunner } from "../../src/commands/setup.js";
 import { runCommand } from "../../src/setup/plugins.js";
 import { parseTar, stripTopDir, writeTree } from "../../src/setup/repo.js";
 import { setPromptIO } from "../../src/setup/ui.js";
-import { mergeServerEntry, upsertTomlTable, buildTomlTable, stripJsonc } from "../../src/setup/mcp-config.js";
+import { mergeServerEntry, upsertTomlTable, stripJsonc } from "../../src/setup/mcp-config.js";
 
 // --- a tiny tar writer, so the fixtures need no binaries ---------------------
 
@@ -94,6 +94,7 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "upstash-setup-"));
   process.env.HOME = home;
   delete process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CODEX_HOME;
   delete process.env.UPSTASH_EMAIL;
   delete process.env.UPSTASH_API_KEY;
   calls = [];
@@ -148,38 +149,80 @@ describe("config merging", () => {
       "url = \"y\"",
       "",
     ].join("\n");
-    const block = buildTomlTable("mcp_servers.upstash", { url: "new" });
-    const { content, replaced } = upsertTomlTable(existing, "mcp_servers.upstash", block);
+    const { content, replaced } = upsertTomlTable(existing, "mcp_servers.upstash", { url: "new" });
     expect(replaced).toBe(true);
     expect(content).toBe('model = "o3"\n\n[mcp_servers.upstash]\nurl = "new"\n\n[mcp_servers.other]\nurl = "y"\n');
   });
 
   it("appends a TOML table to a file that lacks it", () => {
-    const block = buildTomlTable("mcp_servers.upstash", { url: "u" });
-    const { content, replaced } = upsertTomlTable('model = "o3"\n', "mcp_servers.upstash", block);
+    const { content, replaced } = upsertTomlTable('model = "o3"\n', "mcp_servers.upstash", { url: "u" });
     expect(replaced).toBe(false);
     expect(content).toBe('model = "o3"\n\n[mcp_servers.upstash]\nurl = "u"\n');
   });
 
   it("matches quoted TOML keys instead of declaring the table twice", () => {
     const existing = '[mcp_servers."upstash"]  # added by hand\nurl = "old"\n\n[mcp_servers.\'upstash\'.http_headers]\nX = "1"\n\n[[profiles]]\nname = "a"\n';
-    const { content, replaced } = upsertTomlTable(existing, "mcp_servers.upstash", buildTomlTable("mcp_servers.upstash", { url: "new" }));
+    const { content, replaced } = upsertTomlTable(existing, "mcp_servers.upstash", { url: "new" });
     expect(replaced).toBe(true);
     expect(content).toBe('[mcp_servers.upstash]\nurl = "new"\n\n[[profiles]]\nname = "a"\n');
   });
 
-  it("detects inline and dotted definitions outside the table's own section", () => {
-    const block = buildTomlTable("mcp_servers.upstash", { url: "new" });
+  it("refuses layouts it cannot rewrite safely: inline or dotted definitions, inline parent tables", () => {
     for (const existing of [
       'mcp_servers.upstash = { url = "x" }\n',
       'mcp_servers.upstash.url = "x"\n',
       '[mcp_servers]\n"upstash" = { url = "x" }\n',
+      "mcp_servers = { other = { url = 'https://example.com/mcp' } }\n",
     ]) {
-      expect(() => upsertTomlTable(existing, "mcp_servers.upstash", block)).toThrow(/defined inline/);
+      expect(() => upsertTomlTable(existing, "mcp_servers.upstash", { url: "new" })).toThrow(/can't add \[mcp_servers.upstash\] safely/);
     }
-    // Dotted keys inside the table's own section, other servers, and text inside a multi-line string are fine.
-    const ok = '[mcp_servers.upstash]\nurl = "old"\nhttp_headers.X = "1"\n\n[mcp_servers]\nother = { url = "y" }\n\n[notes]\ntext = """\nmcp_servers.upstash = 1\n"""\n';
-    expect(upsertTomlTable(ok, "mcp_servers.upstash", block).replaced).toBe(true);
+    expect(() => upsertTomlTable("not = [valid", "mcp_servers.upstash", { url: "new" })).toThrow(/not valid TOML/);
+    // Dotted keys inside the table's own section and other servers are fine.
+    const ok = '[mcp_servers.upstash]\nurl = "old"\nhttp_headers.X = "1"\n\n[mcp_servers]\nother = { url = "y" }\n';
+    expect(upsertTomlTable(ok, "mcp_servers.upstash", { url: "new" })).toEqual({
+      content: '[mcp_servers.upstash]\nurl = "new"\n\n[mcp_servers]\nother = { url = "y" }\n',
+      replaced: true,
+    });
+  });
+
+  it("ignores table-like lines inside multi-line strings", () => {
+    const existing = [
+      'developer_instructions = """',
+      "Example config:",
+      "[mcp_servers.upstash]",
+      'url = "in a string"',
+      '"""',
+      "",
+      "[profiles.dev]",
+      'model = "o3"',
+      "",
+    ].join("\n");
+    const { content, replaced } = upsertTomlTable(existing, "mcp_servers.upstash", { url: "new" });
+    expect(replaced).toBe(false);
+    expect(content).toBe(existing.trimEnd() + '\n\n[mcp_servers.upstash]\nurl = "new"\n');
+  });
+
+  it("removes upstash sub-tables wherever they sit, and keeps TOML dates", () => {
+    const existing = [
+      "updated = 2026-10-05T09:00:00Z",
+      "",
+      "[mcp_servers.upstash]",
+      'url = "old"',
+      "",
+      "[mcp_servers.other]",
+      'url = "y"',
+      "",
+      "[mcp_servers.upstash.http_headers]",
+      "Authorization = 'Bearer expired'",
+      "",
+      "[profiles.dev]",
+      'model = "o3"',
+      "",
+    ].join("\n");
+    const { content } = upsertTomlTable(existing, "mcp_servers.upstash", { url: "new" });
+    expect(content).toBe(
+      'updated = 2026-10-05T09:00:00Z\n\n[mcp_servers.upstash]\nurl = "new"\n\n[mcp_servers.other]\nurl = "y"\n\n[profiles.dev]\nmodel = "o3"\n',
+    );
   });
 
   it("reads JSONC with comments and trailing commas, leaving strings alone", () => {
@@ -271,6 +314,29 @@ describe("setup", () => {
 
   it("has no --auth option", async () => {
     await expect(run(["--claude", "--auth", "api-key"])).rejects.toThrow(/unknown option '--auth'/);
+  });
+
+  it("reports a failed Claude plugin update instead of claiming success", async () => {
+    setRunner(async (bin, args) => {
+      calls.push([bin, ...args]);
+      const update = bin === "claude" && args[0] === "plugin" && args[1] === "update";
+      return { ok: !update, missing: false, output: update ? "Error: network unreachable" : "" };
+    });
+    const { results } = await runJson(["--claude"]);
+    expect(results[0]).toMatchObject({ agent: "claude", method: "plugin", ok: false });
+    expect(results[0]!.steps.at(-1)).toMatchObject({ status: "failed", detail: "Error: network unreachable" });
+    expect(process.exitCode).toBe(1);
+    // The plugin is installed, so no MCP fallback that would load the server twice.
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+  });
+
+  it("uses CODEX_HOME for Codex's user config and detection", async () => {
+    process.env.CODEX_HOME = join(home, "codex-home");
+    mkdirSync(process.env.CODEX_HOME);
+    const { results } = await runJson(["--yes", "--mode", "mcp"]);
+    expect(results.map((r) => r.agent)).toEqual(["codex"]);
+    expect(read("codex-home", "config.toml")).toBe('[mcp_servers.upstash]\nurl = "https://mcp.upstash.com/mcp"\n');
+    expect(existsSync(join(home, ".codex"))).toBe(false);
   });
 
   it("has no --ref option", async () => {

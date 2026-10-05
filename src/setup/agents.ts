@@ -48,6 +48,11 @@ function claudeGlobalMcpPath(): string {
   return dir ? join(dir, ".claude.json") : home(".claude.json");
 }
 
+/** https://developers.openai.com/codex/config-advanced#config-and-state-locations (`CODEX_HOME`, default ~/.codex) */
+export function codexHome(): string {
+  return process.env.CODEX_HOME || home(".codex");
+}
+
 /** https://code.visualstudio.com/docs/configure/settings#_settings-file-locations */
 export function vscodeUserDir(platform: NodeJS.Platform = process.platform): string {
   if (platform === "win32") {
@@ -94,12 +99,12 @@ export const AGENTS = {
     plugin: { kind: "codex", scopes: ["global"] },
     mcp: {
       format: "toml",
-      paths: (s) => [pick(s, join(".codex", "config.toml"), home(".codex", "config.toml"))],
+      paths: (s) => [pick(s, join(".codex", "config.toml"), join(codexHome(), "config.toml"))],
       configKey: "mcp_servers",
       entry: { url: MCP_URL },
     },
     skillDir: (s) => pick(s, join(".agents", "skills"), home(".agents", "skills")),
-    detect: (s) => [pick(s, ".codex", home(".codex"))],
+    detect: (s) => [pick(s, ".codex", codexHome())],
   },
   /**
    * MCP: https://cursor.com/docs/context/mcp#configuration-locations (~/.cursor/mcp.json, .cursor/mcp.json)

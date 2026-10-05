@@ -1,5 +1,6 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { parse as parseToml } from "smol-toml";
 import { SERVER_NAME, type AgentConfig, type Scope } from "./agents.js";
 
 /** Reads a string literal starting at `i`; returns the index just past its closing quote. */
@@ -147,78 +148,127 @@ const startsWith = (keys: string[], prefix: string[]): boolean =>
   keys.length >= prefix.length && prefix.every((k, i) => keys[i] === k);
 
 /**
- * Whether `table` is defined anywhere other than its own `[table]` section:
- * as a dotted key (`mcp_servers.upstash.url = ...`) or an inline table
- * (`upstash = { ... }` under `[mcp_servers]`). Appending a `[table]` header
- * then would declare it twice and break the whole file.
+ * For each line, whether it starts inside a multi-line string, so text there
+ * that looks like `[table]` is never taken for a header.
  */
-function definedOutsideTable(lines: string[], table: string): boolean {
-  const want = table.split(".");
-  let current: string[] = [];
-  let inMultiline = false;
-  for (const line of lines) {
-    const quotes = (line.match(/"""|'''/g) ?? []).length;
-    if (inMultiline) {
-      if (quotes % 2 === 1) inMultiline = false;
-      continue;
+function linesInString(lines: string[]): boolean[] {
+  let open: string | undefined;
+  return lines.map((line) => {
+    const inside = open !== undefined;
+    for (const [delim] of line.matchAll(/"""|'''/g)) {
+      if (open === undefined) open = delim;
+      else if (open === delim) open = undefined;
     }
-    const array = /^\s*\[\[(.+)\]\]\s*(?:#.*)?$/.exec(line);
-    const header = array ? parseKeys(array[1]!) : tableKeys(line);
-    if (header) {
-      current = header;
-      continue;
-    }
-    const kv = /^\s*([^=#\s][^=]*?)\s*=/.exec(line);
-    const keys = kv ? parseKeys(kv[1]!) : undefined;
-    if (keys && !startsWith(current, want) && startsWith([...current, ...keys], want)) return true;
-    if (quotes % 2 === 1) inMultiline = true;
+    return inside;
+  });
+}
+
+/** Sets `value` at `path`, creating plain objects along the way. */
+function setPath(target: Record<string, unknown>, path: string[], value: unknown): void {
+  let node = target;
+  for (const key of path.slice(0, -1)) {
+    const next = node[key];
+    node = (node[key] = next && typeof next === "object" && !Array.isArray(next) ? next : {}) as Record<string, unknown>;
   }
-  return false;
+  node[path.at(-1)!] = value;
 }
 
-const isTableHeader = (line: string): boolean => /^\s*\[/.test(line) && (tableKeys(line) !== undefined || /^\s*\[\[/.test(line));
-
-function isHeader(line: string, table: string): boolean {
-  const keys = tableKeys(line);
-  const want = table.split(".");
-  return keys !== undefined && keys.length === want.length && keys.every((k, i) => k === want[i]);
+/** Structural equality for parsed TOML: ignores object prototypes, compares dates by their TOML text. */
+function sameToml(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && String(a) === String(b);
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameToml(v, b[i]));
+  }
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  return (
+    ka.length === kb.length &&
+    ka.every((k) => Object.hasOwn(b, k) && sameToml((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+  );
 }
 
-function isSubTable(line: string, table: string): boolean {
-  const keys = tableKeys(line);
-  const want = table.split(".");
-  return keys !== undefined && keys.length > want.length && startsWith(keys, want);
+function getPath(target: unknown, path: string[]): unknown {
+  let node = target;
+  for (const key of path) {
+    if (!node || typeof node !== "object") return undefined;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node;
+}
+
+function parseTomlOrThrow(text: string): Record<string, unknown> {
+  try {
+    return parseToml(text) as Record<string, unknown>;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message.split("\n")[0] : String(err);
+    throw new Error(`not valid TOML (${reason}); fix it and rerun`);
+  }
 }
 
 /**
- * Replaces `[table]` and its `[table.*]` sub-tables, or appends the block.
- * Throws when the table is also defined inline or with dotted keys, which
- * this line-based merge cannot rewrite safely.
+ * Sets `[table]` to `entry`: removes every `[table]` / `[table.*]` section
+ * wherever it sits, writes the new block where the first one was (or at the
+ * end), and leaves every other line, comments included, as it was.
+ *
+ * The edit is line-based to keep the file's formatting, so the result is
+ * parsed and compared with the expected document before it is returned. A
+ * layout this cannot rewrite safely (the table, or a parent table, defined
+ * inline or with dotted keys) throws instead of producing a broken file.
  */
 export function upsertTomlTable(
   existing: string,
   table: string,
-  block: string,
+  entry: Record<string, unknown>,
 ): { content: string; replaced: boolean } {
+  const path = table.split(".");
+  const before = parseTomlOrThrow(existing);
+  const replaced = getPath(before, path) !== undefined;
+
   const lines = existing.split("\n");
-  if (definedOutsideTable(lines, table)) {
-    throw new Error(`${table} is defined inline or with dotted keys; replace it with a [${table}] table or remove it, then rerun`);
-  }
-  const start = lines.findIndex((l) => isHeader(l, table));
-  if (start === -1) {
+  const inString = linesInString(lines);
+  const headers = lines.flatMap((line, i) => (!inString[i] && /^\s*\[/.test(line) ? [i] : []));
+  const block = buildTomlTable(table, entry).trimEnd().split("\n");
+
+  const out: string[] = lines.slice(0, headers[0] ?? lines.length);
+  let inserted = false;
+  headers.forEach((start, n) => {
+    const end = headers[n + 1] ?? lines.length;
+    const keys = tableKeys(lines[start]!);
+    if (keys && startsWith(keys, path)) {
+      if (!inserted) out.push(...block, ...(end < lines.length ? [""] : []));
+      inserted = true;
+      return;
+    }
+    out.push(...lines.slice(start, end));
+  });
+
+  let content: string;
+  if (inserted) {
+    content = out.join("\n").trimEnd() + "\n";
+  } else {
     const base = existing.trimEnd();
-    return { content: (base ? `${base}\n\n` : "") + block, replaced: false };
+    content = (base ? `${base}\n\n` : "") + block.join("\n") + "\n";
   }
-  let end = start + 1;
-  while (end < lines.length) {
-    const line = lines[end]!;
-    if (isTableHeader(line) && !isSubTable(line, table)) break;
-    end++;
+
+  // A fresh parse rather than a clone, so TOML dates keep their class.
+  const expected = parseTomlOrThrow(existing);
+  setPath(expected, path, entry);
+  let after: unknown;
+  try {
+    after = parseToml(content);
+  } catch {
+    after = undefined;
   }
-  const before = lines.slice(0, start).join("\n").trimEnd();
-  const after = lines.slice(end).join("\n").trim();
-  const content = [before, block.trimEnd(), after].filter((s) => s.length > 0).join("\n\n");
-  return { content: content + "\n", replaced: true };
+  if (!sameToml(after, expected)) {
+    throw new Error(
+      `can't add [${table}] safely: it, or a parent table, is defined inline or with dotted keys. Remove that definition or add the table by hand, then rerun`,
+    );
+  }
+  return { content, replaced };
 }
 
 async function firstExisting(candidates: string[]): Promise<string> {
@@ -248,9 +298,8 @@ export async function writeMcpEntry(
   let replaced: boolean;
 
   if (agent.mcp.format === "toml") {
-    const block = buildTomlTable(`${agent.mcp.configKey}.${SERVER_NAME}`, entry);
     try {
-      ({ content, replaced } = upsertTomlTable(await readText(path), `${agent.mcp.configKey}.${SERVER_NAME}`, block));
+      ({ content, replaced } = upsertTomlTable(await readText(path), `${agent.mcp.configKey}.${SERVER_NAME}`, entry));
     } catch (err) {
       throw new Error(`${path}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -269,10 +318,9 @@ export async function writeMcpEntry(
 export async function hasMcpEntry(agent: AgentConfig, scope: Scope): Promise<string | undefined> {
   const path = await resolveMcpPath(agent, scope);
   if (agent.mcp.format === "toml") {
-    const table = `${agent.mcp.configKey}.${SERVER_NAME}`;
     try {
-      const lines = (await readText(path)).split("\n");
-      return lines.some((l) => isHeader(l, table)) || definedOutsideTable(lines, table) ? path : undefined;
+      const config = parseToml(await readText(path));
+      return getPath(config, [agent.mcp.configKey, SERVER_NAME]) !== undefined ? path : undefined;
     } catch {
       return undefined;
     }

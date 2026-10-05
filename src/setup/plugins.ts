@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { PLUGIN_ID, SKILLS_REPO, type PluginKind, type Scope } from "./agents.js";
+import { PLUGIN_ID, SKILLS_REPO, codexHome, type PluginKind, type Scope } from "./agents.js";
 import { subtree, writeTree, type RepoFiles } from "./repo.js";
 
 export type StepStatus = "done" | "planned" | "failed";
@@ -18,6 +18,8 @@ export interface PluginResult {
   ok: boolean;
   /** The agent's CLI binary, when it is not on PATH and there was nothing to call. */
   missing?: string;
+  /** Set when the plugin is installed although a later step failed, so falling back to MCP would duplicate it. */
+  installed?: boolean;
   steps: Step[];
   notes: string[];
 }
@@ -109,9 +111,18 @@ async function claude(ctx: PluginContext): Promise<PluginResult> {
     ["plugin", "install", PLUGIN_ID, "--scope", scope],
     `Plugin ${PLUGIN_ID} (${scope} scope)`,
   );
-  // `install` reports success without upgrading an existing install.
-  if (result.ok && !ctx.dryRun) await ctx.run("claude", ["plugin", "update", PLUGIN_ID, "--scope", scope]);
-  return result;
+  if (!result.ok || ctx.dryRun) return result;
+  // `install` reports success without upgrading an existing install, so a
+  // failed update can leave an old plugin in place: report it rather than
+  // claim success. The plugin is installed either way, so no MCP fallback.
+  const update = await ctx.run("claude", ["plugin", "update", PLUGIN_ID, "--scope", scope]);
+  if (update.ok) return result;
+  return {
+    ok: false,
+    installed: true,
+    steps: [...result.steps, { label: `Update ${PLUGIN_ID}`, status: "failed", detail: reason(update.output) }],
+    notes: result.notes,
+  };
 }
 
 /**
@@ -212,7 +223,7 @@ export async function isPluginInstalled(kind: PluginKind): Promise<boolean> {
     case "claude":
       return fileIncludes(join(claudeDir, "plugins", "installed_plugins.json"), `"${PLUGIN_ID}"`);
     case "codex":
-      return fileIncludes(join(homedir(), ".codex", "config.toml"), `[plugins."${PLUGIN_ID}"]`);
+      return fileIncludes(join(codexHome(), "config.toml"), `[plugins."${PLUGIN_ID}"]`);
     case "cursor":
       return access(cursorPluginDir()).then(() => true, () => false);
     case "gemini":

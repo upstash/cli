@@ -209,7 +209,7 @@ async function setupAgent(name: AgentName, ctx: AgentContext): Promise<AgentResu
 
   if (choice.method === "plugin" && agent.plugin) {
     const res = await installPlugin(agent.plugin.kind, { scope, dryRun, run: runner, repo });
-    if (res.ok || mode === "plugin") {
+    if (res.ok || res.installed || mode === "plugin") {
       if (res.missing) notes.push(`\`${res.missing}\` not found on PATH.`);
       const manual = res.ok ? await hasMcpEntry(agent, scope) : undefined;
       if (manual) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import pkg from "../package.json" with { type: "json" };
-const { version } = pkg;
+const { name, version } = pkg;
 import { registerRedis } from "./commands/redis/index.js";
 import { registerTeam } from "./commands/team/index.js";
 import { registerVector } from "./commands/vector/index.js";
@@ -14,6 +14,7 @@ import { registerStartRedis } from "./commands/start-redis.js";
 import { registerTelemetry } from "./commands/telemetry.js";
 import { registerSetup } from "./commands/setup.js";
 import { handleError } from "./output.js";
+import { withDefaultCommand } from "./short-name.js";
 import dotenv from "dotenv";
 
 // Pre-scan argv for --env-path before Commander parses, so dotenv loads
@@ -53,4 +54,6 @@ registerSearch(program);
 registerQStash(program);
 registerBlob(program);
 
-program.parseAsync().catch(handleError);
+const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+const args = withDefaultCommand(name, process.argv.slice(2), interactive);
+program.parseAsync(args, { from: "user" }).catch(handleError);

@@ -10,8 +10,10 @@ Agent-friendly CLI for managing & debugging Upstash resources from your terminal
 Requires Node.js 20 or newer.
 
 ```bash
-npm i -g @upstash/cli
+npm i -g upstash
 ```
+
+`upstash` and `@upstash/cli` are the same CLI, published from the same build with the same version. The only difference: a bare `upstash` in a terminal runs `upstash setup`.
 
 For agents, pair the CLI with the [Upstash Skill](https://docs.upstash.com/agent-resources/skills), it bundles Upstash docs alongside docs for the `upstash` CLI.
 
@@ -24,8 +26,10 @@ npx skills add upstash/skills
 One command wires Upstash into your coding agents:
 
 ```bash
-npx @upstash/cli setup
+npx upstash
 ```
+
+With no arguments in a terminal, `upstash` runs `upstash setup`. From an agent or a script, a bare `upstash` prints the help instead, so run `upstash setup` explicitly there.
 
 It picks the best install path per agent:
 

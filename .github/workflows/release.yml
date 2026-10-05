@@ -31,10 +31,25 @@ jobs:
 
       - run: npm run build
 
+      # Publishes `upstash` (the name in package.json), then the same build
+      # again as @upstash/cli so existing installs keep getting releases.
       - name: Publish release candidate
         if: github.event.release.prerelease
         run: npm publish --access public --tag=canary --provenance
 
       - name: Publish
+        if: "!github.event.release.prerelease"
+        run: npm publish --access public --provenance
+
+      - name: Rename the package to @upstash/cli
+        run: |
+          jq '.name = "@upstash/cli"' package.json > package.tmp.json
+          mv package.tmp.json package.json
+
+      - name: Publish @upstash/cli release candidate
+        if: github.event.release.prerelease
+        run: npm publish --access public --tag=canary --provenance
+
+      - name: Publish @upstash/cli
         if: "!github.event.release.prerelease"
         run: npm publish --access public --provenance

@@ -12,6 +12,7 @@ import { registerLogin } from "./commands/login.js";
 import { registerLogout } from "./commands/logout.js";
 import { registerStartRedis } from "./commands/start-redis.js";
 import { registerTelemetry } from "./commands/telemetry.js";
+import { registerSetup } from "./commands/setup.js";
 import { handleError } from "./output.js";
 import dotenv from "dotenv";
 
@@ -43,6 +44,7 @@ program
 registerLogin(program);
 registerLogout(program);
 registerStartRedis(program);
+registerSetup(program);
 registerTelemetry(program);
 registerRedis(program);
 registerTeam(program);

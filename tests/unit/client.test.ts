@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { request } from "../../src/client.js";
 
-const auth = { email: "user@example.com", apiKey: "key" };
+const auth = { kind: "api-key" as const, email: "user@example.com", apiKey: "key" };
 
 afterEach(() => {
   vi.restoreAllMocks();

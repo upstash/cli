@@ -8,7 +8,7 @@ import { telemetryHeaders, telemetryStatus } from "../../src/telemetry.js";
 import { request } from "../../src/client.js";
 import { registerTelemetry } from "../../src/commands/telemetry.js";
 
-const auth = { email: "user@example.com", apiKey: "key" };
+const auth = { kind: "api-key" as const, email: "user@example.com", apiKey: "key" };
 
 let dir: string;
 const originalEnv = { ...process.env };

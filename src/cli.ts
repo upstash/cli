@@ -10,6 +10,7 @@ import { registerQStash } from "./commands/qstash/index.js";
 import { registerBlob } from "./commands/blob/index.js";
 import { registerLogin } from "./commands/login.js";
 import { registerLogout } from "./commands/logout.js";
+import { registerWhoami } from "./commands/whoami.js";
 import { registerStartRedis } from "./commands/start-redis.js";
 import { registerTelemetry } from "./commands/telemetry.js";
 import { registerSetup } from "./commands/setup.js";
@@ -44,6 +45,7 @@ program
 
 registerLogin(program);
 registerLogout(program);
+registerWhoami(program);
 registerStartRedis(program);
 registerSetup(program);
 registerTelemetry(program);

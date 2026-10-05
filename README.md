@@ -1,7 +1,7 @@
 # Upstash CLI
 
 [![GitHub release](https://img.shields.io/github/v/release/upstash/cli)](https://github.com/upstash/cli/releases/latest)
-[![npm downloads](https://img.shields.io/npm/dw/@upstash/cli.svg)](https://npmjs.org/package/@upstash/cli)
+[![npm downloads](https://img.shields.io/npm/dw/upstash.svg)](https://npmjs.org/package/upstash)
 
 Agent-friendly CLI for managing & debugging Upstash resources from your terminal. [Docs](https://upstash.com/docs/agent-resources/cli).
 
@@ -13,7 +13,7 @@ Requires Node.js 20 or newer.
 npm i -g upstash
 ```
 
-`upstash` and `@upstash/cli` are the same CLI, published from the same build with the same version. The only difference: a bare `upstash` in a terminal runs `upstash setup`.
+The same build is also published as `@upstash/cli`, with the same version, so existing installs keep working.
 
 For agents, pair the CLI with the [Upstash Skill](https://docs.upstash.com/agent-resources/skills), it bundles Upstash docs alongside docs for the `upstash` CLI.
 

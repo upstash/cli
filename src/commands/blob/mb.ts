@@ -5,7 +5,7 @@ import { printJSON } from "../../output.js";
 import { BLOB_VISIBILITIES } from "../../types.js";
 import type { BlobBucket, BlobVisibility } from "../../types.js";
 import { BucketResolver, findAccountBucket } from "./buckets.js";
-import { parseVisibility } from "./create.js";
+import { CORS_HELP, parseCorsOrigin, parseVisibility } from "./create.js";
 import { deleteBlobBucket } from "./delete.js";
 import { listBlobs, parseBucket, runOperations } from "./transfer.js";
 
@@ -19,7 +19,7 @@ export function registerBlobMb(blob: Command): void {
       parseVisibility,
       "private",
     )
-    .option("--cors <origins...>", "Allowed CORS origins (space-separated)")
+    .option("--cors <origins...>", CORS_HELP, parseCorsOrigin)
     .action(async (uri: string, flags: { visibility: BlobVisibility; cors?: string[] }, cmd: Command) => {
       const name = parseBucket(uri);
       const bucket = await request<BlobBucket>(resolveAuth(cmd), "POST", "/v2/blob/bucket", {

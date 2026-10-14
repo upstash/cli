@@ -636,6 +636,18 @@ describe("--env-file", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("create refuses an empty path or a read-only file before creating anything", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const readOnly = join(dir, ".env");
+    await writeFile(readOnly, "A=1\n", { mode: 0o400 });
+    for (const [path, message] of [["", /needs a path/], [readOnly, /not writable/]] as const) {
+      await expect(
+        runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--env-file", path]),
+      ).rejects.toThrow(message);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("refuses a response without a token and leaves the file alone", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify(makeBucket({ token: undefined, token_next: undefined })), { status: 200 }),

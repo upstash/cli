@@ -111,9 +111,13 @@ export function registerBlobCreate(blob: Command): void {
           const reason = error instanceof Error ? error.message : String(error);
           throw new Error(
             `bucket ${bucket.name} was created, but its token could not be written (${reason}); ` +
-              `run: upstash blob get ${bucket.name} --env-file ${flags.envFile}`,
+              `run: upstash blob get ${bucket.name} --env-file ${shellQuote(flags.envFile)}`,
           );
         }
       },
     );
+}
+
+function shellQuote(value: string): string {
+  return /^[\w./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
 }

@@ -1,4 +1,5 @@
-import { chmod, readFile, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, chmod, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { BlobBucket } from "../../types.js";
 
@@ -11,11 +12,17 @@ export const ENV_FILE_HELP =
 
 /** Fails before a bucket is created when the token would have nowhere to go. */
 export async function checkEnvFileTarget(path: string): Promise<void> {
+  if (path.trim() === "") throw new Error("--env-file needs a path, e.g. --env-file .env.local");
   const existing = await stat(path).catch(() => undefined);
   if (existing?.isDirectory()) throw new Error(`--env-file: ${path} is a directory`);
-  if (existing) return;
-  const dir = await stat(dirname(path)).catch(() => undefined);
-  if (!dir?.isDirectory()) throw new Error(`--env-file: directory ${dirname(path)} does not exist`);
+  const target = existing ? path : dirname(path);
+  if (!existing) {
+    const dir = await stat(target).catch(() => undefined);
+    if (!dir?.isDirectory()) throw new Error(`--env-file: directory ${target} does not exist`);
+  }
+  await access(target, constants.W_OK).catch(() => {
+    throw new Error(`--env-file: ${target} is not writable`);
+  });
 }
 
 /**
@@ -23,6 +30,7 @@ export async function checkEnvFileTarget(path: string): Promise<void> {
  * rewritten in place, otherwise one line is appended. Everything else is kept byte for byte.
  */
 export async function writeEnvVar(path: string, name: string, value: string): Promise<void> {
+  await checkEnvFileTarget(path);
   let content = "";
   let exists = true;
   try {

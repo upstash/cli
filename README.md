@@ -109,6 +109,7 @@ upstash blob ls my-bucket
 upstash blob cp ./assets blob://my-bucket/assets -r
 upstash blob sync ./site blob://my-bucket/site -d
 upstash blob credentials my-bucket
+upstash blob cors my-bucket https://app.example.com   # replaces allowed origins; '*' allows all
 
 # Team
 upstash team list
@@ -139,8 +140,8 @@ upstash blob rb new-bucket -f
 
 `cp`, `mv` and `sync` need `blob://` to tell bucket paths from local ones. The
 commands that only take bucket paths (`ls`, `rm`, `presign`, `mb`, `rb`) accept
-`my-bucket/key` without it, as do `get`, `delete` and `credentials`, which take a
-bucket name or id.
+`my-bucket/key` without it, as do `get`, `delete`, `credentials` and `cors`, which
+take a bucket name or id.
 
 Flags follow `aws s3`: `-r/--recursive`, `--exclude`/`--include` (applied in
 order, last match wins), `-n/--dryrun`, `-d/--delete`, `--size-only`,

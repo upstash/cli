@@ -707,13 +707,17 @@ describe("--cors validation", () => {
     ["HTTPS://App.Example.com", "https://app.example.com"],
     ["https://a.com,https://b.com", undefined],
     ["capacitor://localhost", undefined],
+    ["https://*.*.example.com", undefined],
+    ["*.*.example.com", undefined],
+    ["https://*.example.com:*", undefined],
+    ["http://localhost:*", undefined],
   ])("rejects %j", (value, guess) => {
     const problem = corsOriginProblem(value);
     expect(problem).toContain(`${JSON.stringify(value)} is not a valid origin`);
     if (guess) expect(problem).toContain(`did you mean ${guess}?`);
   });
 
-  it.each(["*", "http://localhost:3000", "https://app.example.com", "https://*.example.com", "http://127.0.0.1:8080", "http://intranet:8080"])(
+  it.each(["*", "http://localhost:3000", "https://app.example.com", "https://*.example.com", "https://app-*.example.com", "http://127.0.0.1:8080", "http://intranet:8080"])(
     "accepts %j",
     (value) => {
       expect(corsOriginProblem(value)).toBeUndefined();
@@ -736,6 +740,8 @@ describe("--cors validation", () => {
     await expect(runCommand(await createBlobProgram(), ["blob", "cors", "my-bucket", "https://a.example.com", "localhost:3000"]))
       .rejects.toThrow(/did you mean http:\/\/localhost:3000\?/);
     await expect(runCommand(await createBlobProgram(), ["blob", "cors", "my-bucket"])).rejects.toThrow(/missing required argument/);
+    await expect(runCommand(await createBlobProgram(), ["blob", "cors", "my-bucket", "https://*.*.example.com"]))
+      .rejects.toThrow(/may hold at most one \* wildcard/);
     expect(fetchSpy).not.toHaveBeenCalled();
     stderr.mockRestore();
   });

@@ -18,7 +18,8 @@ export function parseVisibility(value: string): BlobVisibility {
 export const CORS_HELP =
   "Allowed CORS origins, space-separated, each http(s)://host[:port] " +
   "(e.g. http://localhost:3000 https://app.example.com). " +
-  "Omit --cors to allow all origins (*). Browser uploads are refused from any origin not listed";
+  "Omit --cors to allow all origins (*). Browser uploads are refused from any origin not listed. " +
+  "Change them later with: upstash blob cors <bucket> <origins...>";
 
 const ORIGIN_EXAMPLE = "expected http(s)://host[:port], e.g. https://app.example.com or http://localhost:3000";
 const WILDCARD = "wildcard.invalid";
@@ -33,7 +34,7 @@ export function corsOriginProblem(value: string): string | undefined {
   const shown = JSON.stringify(value);
   if (value.trim() === "") return `${shown} is not a valid origin, ${ORIGIN_EXAMPLE}`;
   if (/[\s,]/.test(value.trim())) {
-    return `${shown} is not a valid origin: pass each origin as its own argument, separated by spaces (--cors https://a.example.com https://b.example.com)`;
+    return `${shown} is not a valid origin: pass each origin as its own argument, separated by spaces (https://a.example.com https://b.example.com)`;
   }
   if (!value.includes("://")) {
     const local = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(value);

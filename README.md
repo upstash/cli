@@ -103,6 +103,7 @@ upstash qstash stats --qstash-id $QSTASH_ID --period 7d
 
 # Blob
 upstash blob create --name my-bucket --visibility private
+upstash blob get my-bucket --write-env .env.local   # writes UPSTASH_BLOB_TOKEN, omits it from output
 upstash blob ls
 upstash blob ls my-bucket
 upstash blob cp ./assets blob://my-bucket/assets -r

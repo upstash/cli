@@ -5,6 +5,8 @@ import type { BlobBucket } from "../../types.js";
 
 export const BLOB_TOKEN_ENV = "UPSTASH_BLOB_TOKEN";
 
+// The flag is --write-env and not --env-file: Node reads --env-file from anywhere in argv, even
+// after the script, and exits with "not found" when the file does not exist yet.
 export const ENV_FILE_HELP =
   `Write the bucket token to this env file as ${BLOB_TOKEN_ENV} (e.g. .env.local), ` +
   "and print the bucket without its tokens. The file is created if missing, an existing " +
@@ -13,23 +15,23 @@ export const ENV_FILE_HELP =
 
 /** Fails before a bucket is created when the token would have nowhere to go. */
 export async function checkEnvFileTarget(path: string): Promise<void> {
-  if (path.trim() === "") throw new Error("--env-file needs a path, e.g. --env-file .env.local");
+  if (path.trim() === "") throw new Error("--write-env needs a path, e.g. --write-env .env.local");
   const existing = await stat(path).catch(() => undefined);
   if (!existing && (await lstat(path).catch(() => undefined))?.isSymbolicLink()) {
-    throw new Error(`--env-file: ${path} is a symlink to a file that cannot be reached`);
+    throw new Error(`--write-env: ${path} is a symlink to a file that cannot be reached`);
   }
-  if (existing?.isDirectory() || /[\\/]$/.test(path)) throw new Error(`--env-file: ${path} is a directory`);
+  if (existing?.isDirectory() || /[\\/]$/.test(path)) throw new Error(`--write-env: ${path} is a directory`);
   // Only the owner (or root) can narrow the mode to 600, and the token is not written without it.
   if (existing && process.getuid && process.getuid() !== 0 && existing.uid !== process.getuid()) {
-    throw new Error(`--env-file: ${path} belongs to another user, so its mode cannot be set to 600`);
+    throw new Error(`--write-env: ${path} belongs to another user, so its mode cannot be set to 600`);
   }
   const target = existing ? path : dirname(path);
   if (!existing) {
     const dir = await stat(target).catch(() => undefined);
-    if (!dir?.isDirectory()) throw new Error(`--env-file: directory ${target} does not exist`);
+    if (!dir?.isDirectory()) throw new Error(`--write-env: directory ${target} does not exist`);
   }
   await access(target, constants.W_OK).catch(() => {
-    throw new Error(`--env-file: ${target} is not writable`);
+    throw new Error(`--write-env: ${target} is not writable`);
   });
 }
 
@@ -72,7 +74,7 @@ export async function writeEnvVar(path: string, name: string, value: string): Pr
 /** Writes the bucket's token to the env file and returns what is safe to print. */
 export async function saveBucketToken(bucket: BlobBucket, path: string): Promise<Omit<BlobBucket, "token" | "token_next">> {
   const { token, token_next: _tokenNext, ...rest } = bucket;
-  if (!token) throw new Error(`--env-file: the response carried no token, so ${path} was not changed`);
+  if (!token) throw new Error(`--write-env: the response carried no token, so ${path} was not changed`);
   await writeEnvVar(path, BLOB_TOKEN_ENV, token);
   console.error(`Wrote ${BLOB_TOKEN_ENV} to ${path}`);
   return rest;

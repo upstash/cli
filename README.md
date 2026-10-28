@@ -109,7 +109,7 @@ upstash blob ls my-bucket
 upstash blob cp ./assets blob://my-bucket/assets -r
 upstash blob sync ./site blob://my-bucket/site -d
 upstash blob credentials my-bucket
-upstash blob cors my-bucket https://app.example.com   # replaces allowed origins; '*' allows all
+upstash blob cors my-bucket https://app.example.com   # replaces allowed origins; '*' allows all (bare * in cmd/PowerShell)
 
 # Team
 upstash team list

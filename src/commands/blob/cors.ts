@@ -14,7 +14,7 @@ export function registerBlobCors(blob: Command): void {
     .addArgument(
       new Argument(
         "<origins...>",
-        "New origins, space-separated, each http(s)://host[:port]; '*' allows all origins",
+        "New origins, space-separated, each http(s)://host[:port]; * allows all origins (quote it as '*' in bash and zsh, bare in cmd and PowerShell)",
       ).argParser(parseCorsOrigin),
     )
     .addHelpText(

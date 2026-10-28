@@ -33,6 +33,7 @@ const WILDCARD = "wildcard.invalid";
  */
 export function corsOriginProblem(value: string): string | undefined {
   if (value === "*") return undefined;
+  if (value === "'*'") return `${JSON.stringify(value)} is not a valid origin: this shell passed the quotes through, so pass * without them`;
   const shown = JSON.stringify(value);
   if (value.trim() === "") return `${shown} is not a valid origin, ${ORIGIN_EXAMPLE}`;
   if (/[\s,]/.test(value.trim())) {

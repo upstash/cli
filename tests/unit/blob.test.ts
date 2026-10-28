@@ -733,6 +733,7 @@ describe("--cors validation", () => {
     ["https://*.example.com:*", undefined],
     ["http://localhost:*", undefined],
     ["https://'*'", undefined],
+    ["'*'", undefined],
     ["https://a!b.com", undefined],
   ])("rejects %j", (value, guess) => {
     const problem = corsOriginProblem(value);

@@ -59,6 +59,10 @@ function suggestion(value: string, guessedScheme = false): string | undefined {
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     if (!url.hostname || url.username || url.password) return undefined;
     if (guessedScheme && !/[.[]/.test(url.hostname) && url.hostname !== "localhost") return undefined;
+    // The URL parser lets through hosts no browser sends as an origin, such as https://'*' (what
+    // cmd.exe makes of a quoted '*'): saved, they would never match anything.
+    const host = url.hostname.replaceAll(WILDCARD, "*");
+    if (!/^[a-z0-9*.-]+$/i.test(host) && !/^\[[0-9a-f:.]+\]$/i.test(host)) return undefined;
     return url.origin.replaceAll(WILDCARD, "*");
   } catch {
     return undefined;
@@ -119,5 +123,8 @@ export function registerBlobCreate(blob: Command): void {
 }
 
 function shellQuote(value: string): string {
-  return /^[\w./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+  if (/^[\w./-]+$/.test(value)) return value;
+  // cmd.exe passes single quotes through, so Windows gets double quotes, which cmd and PowerShell both take.
+  if (process.platform === "win32") return `"${value}"`;
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }

@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, chmod, readFile, stat, writeFile } from "node:fs/promises";
+import { access, chmod, lstat, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { BlobBucket } from "../../types.js";
 
@@ -8,15 +8,19 @@ export const BLOB_TOKEN_ENV = "UPSTASH_BLOB_TOKEN";
 export const ENV_FILE_HELP =
   `Write the bucket token to this env file as ${BLOB_TOKEN_ENV} (e.g. .env.local), ` +
   "and print the bucket without its tokens. The file is created if missing, an existing " +
-  `${BLOB_TOKEN_ENV} line is replaced, other lines are kept, and the mode is set to 600`;
+  `${BLOB_TOKEN_ENV} line is replaced, other lines are kept, and the mode is set to 600. ` +
+  "Not to be confused with the global --env-path, which reads credentials from a file";
 
 /** Fails before a bucket is created when the token would have nowhere to go. */
 export async function checkEnvFileTarget(path: string): Promise<void> {
   if (path.trim() === "") throw new Error("--env-file needs a path, e.g. --env-file .env.local");
   const existing = await stat(path).catch(() => undefined);
+  if (!existing && (await lstat(path).catch(() => undefined))?.isSymbolicLink()) {
+    throw new Error(`--env-file: ${path} is a symlink to a file that cannot be reached`);
+  }
   if (existing?.isDirectory() || /[\\/]$/.test(path)) throw new Error(`--env-file: ${path} is a directory`);
-  // Only the owner can narrow the mode to 600, and the token is not written without it.
-  if (existing && process.getuid && existing.uid !== process.getuid()) {
+  // Only the owner (or root) can narrow the mode to 600, and the token is not written without it.
+  if (existing && process.getuid && process.getuid() !== 0 && existing.uid !== process.getuid()) {
     throw new Error(`--env-file: ${path} belongs to another user, so its mode cannot be set to 600`);
   }
   const target = existing ? path : dirname(path);

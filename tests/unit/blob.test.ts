@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -636,6 +636,16 @@ describe("--env-file", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("create refuses a symlink to an unreachable file before creating anything", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const path = join(dir, ".env");
+    await symlink(join(dir, "missing", "x"), path);
+    await expect(runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--env-file", path])).rejects.toThrow(
+      /symlink to a file that cannot be reached/,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("keeps mixed line endings as they were", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
     const path = join(dir, ".env");
@@ -691,6 +701,8 @@ describe("--cors validation", () => {
     ["HTTPS://App.Example.com", "https://app.example.com"],
     ["https://a.com,https://b.com", undefined],
     ["capacitor://localhost", undefined],
+    ["https://'*'", undefined],
+    ["https://a!b.com", undefined],
   ])("rejects %j", (value, guess) => {
     const problem = corsOriginProblem(value);
     expect(problem).toContain(`${JSON.stringify(value)} is not a valid origin`);

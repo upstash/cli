@@ -646,6 +646,14 @@ describe("--write-env", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("writes through a symlink to a file not created yet", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
+    const path = join(dir, ".env");
+    await symlink(join(dir, "real.env"), path);
+    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
+    expect(await readFile(join(dir, "real.env"), "utf8")).toContain("UPSTASH_BLOB_TOKEN=");
+  });
+
   it("keeps mixed line endings as they were", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
     const path = join(dir, ".env");
@@ -660,7 +668,10 @@ describe("--write-env", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const readOnly = join(dir, ".env");
     await writeFile(readOnly, "A=1\n", { mode: 0o400 });
-    for (const [path, message] of [["", /needs a path/], [readOnly, /not writable/], [join(dir, "new") + "/", /is a directory/]] as const) {
+    // Root may write a 0400 file, so that case only holds for other users.
+    const cases: [string, RegExp][] = [["", /needs a path/], [join(dir, "new") + "/", /is a directory/]];
+    if (process.getuid?.() !== 0) cases.push([readOnly, /not writable/]);
+    for (const [path, message] of cases) {
       await expect(
         runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path]),
       ).rejects.toThrow(message);

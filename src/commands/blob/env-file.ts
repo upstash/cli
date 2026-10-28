@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
-import { access, chmod, lstat, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { access, chmod, lstat, readFile, readlink, stat, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import type { BlobBucket } from "../../types.js";
 
 export const BLOB_TOKEN_ENV = "UPSTASH_BLOB_TOKEN";
@@ -17,8 +17,12 @@ export const ENV_FILE_HELP =
 export async function checkEnvFileTarget(path: string): Promise<void> {
   if (path.trim() === "") throw new Error("--write-env needs a path, e.g. --write-env .env.local");
   const existing = await stat(path).catch(() => undefined);
+  // A link to a file not created yet is fine, as long as the directory it points into exists.
   if (!existing && (await lstat(path).catch(() => undefined))?.isSymbolicLink()) {
-    throw new Error(`--write-env: ${path} is a symlink to a file that cannot be reached`);
+    const target = resolve(dirname(path), await readlink(path));
+    if (!(await stat(dirname(target)).catch(() => undefined))?.isDirectory()) {
+      throw new Error(`--write-env: ${path} is a symlink to a file that cannot be reached`);
+    }
   }
   if (existing?.isDirectory() || /[\\/]$/.test(path)) throw new Error(`--write-env: ${path} is a directory`);
   // Only the owner (or root) can narrow the mode to 600, and the token is not written without it.

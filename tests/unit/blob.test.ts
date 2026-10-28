@@ -593,7 +593,7 @@ describe("blob delete retries", () => {
   });
 });
 
-describe("--env-file", () => {
+describe("--write-env", () => {
   let dir: string;
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "upstash-env-file-"));
@@ -612,7 +612,7 @@ describe("--env-file", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
     const path = join(dir, ".env.local");
 
-    const result = await runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--env-file", path]);
+    const result = await runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path]);
 
     expect(result).toEqual(tokenless());
     expect(JSON.stringify(result)).not.toContain("token_");
@@ -625,7 +625,7 @@ describe("--env-file", () => {
     const path = join(dir, ".env.local");
     await writeFile(path, "# app\nDATABASE_URL=postgres://x\nexport UPSTASH_BLOB_TOKEN=old\nOTHER=1\n# UPSTASH_BLOB_TOKEN=commented\n", { mode: 0o644 });
 
-    const result = await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--env-file", path]);
+    const result = await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
 
     expect(result).toEqual(tokenless());
     expect(await readFile(path, "utf8")).toBe(
@@ -639,7 +639,7 @@ describe("--env-file", () => {
     const path = join(dir, ".env");
     await writeFile(path, "A=1\r\nB=2");
 
-    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--env-file", path]);
+    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
 
     expect(await readFile(path, "utf8")).toBe("A=1\r\nB=2\r\nUPSTASH_BLOB_TOKEN=token_current\r\n");
   });
@@ -647,7 +647,7 @@ describe("--env-file", () => {
   it("create refuses a target directory that does not exist before creating anything", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     await expect(
-      runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--env-file", join(dir, "missing", ".env")]),
+      runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", join(dir, "missing", ".env")]),
     ).rejects.toThrow(/does not exist/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -656,7 +656,7 @@ describe("--env-file", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const path = join(dir, ".env");
     await symlink(join(dir, "missing", "x"), path);
-    await expect(runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--env-file", path])).rejects.toThrow(
+    await expect(runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path])).rejects.toThrow(
       /symlink to a file that cannot be reached/,
     );
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -667,7 +667,7 @@ describe("--env-file", () => {
     const path = join(dir, ".env");
     await writeFile(path, "A=1\r\nUPSTASH_BLOB_TOKEN=old\nB=2\n");
 
-    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--env-file", path]);
+    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
 
     expect(await readFile(path, "utf8")).toBe("A=1\r\nUPSTASH_BLOB_TOKEN=token_current\nB=2\n");
   });
@@ -678,7 +678,7 @@ describe("--env-file", () => {
     await writeFile(readOnly, "A=1\n", { mode: 0o400 });
     for (const [path, message] of [["", /needs a path/], [readOnly, /not writable/], [join(dir, "new") + "/", /is a directory/]] as const) {
       await expect(
-        runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--env-file", path]),
+        runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path]),
       ).rejects.toThrow(message);
     }
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -691,7 +691,7 @@ describe("--env-file", () => {
     const path = join(dir, ".env");
     await writeFile(path, "A=1\n");
     await expect(
-      runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--env-file", path]),
+      runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]),
     ).rejects.toThrow(/no token/);
     expect(await readFile(path, "utf8")).toBe("A=1\n");
   });
@@ -701,7 +701,7 @@ describe("--env-file", () => {
     const blob = program.commands.find((c) => c.name() === "blob")!;
     for (const name of ["create", "get"]) {
       const help = blob.commands.find((c) => c.name() === name)!.helpInformation();
-      expect(help).toContain("--env-file <path>");
+      expect(help).toContain("--write-env <path>");
       expect(help).toContain("UPSTASH_BLOB_TOKEN");
     }
   });

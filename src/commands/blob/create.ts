@@ -85,7 +85,7 @@ export function parseCorsOrigin(value: string, previous: string[] | undefined): 
 export function registerBlobCreate(blob: Command): void {
   blob
     .command("create")
-    .description("Create a Blob bucket. Add --env-file .env.local to save its token for @upstash/blob")
+    .description("Create a Blob bucket. Add --write-env .env.local to save its token for @upstash/blob")
     .requiredOption("--name <name>", "Bucket name")
     .option(
       "--visibility <visibility>",
@@ -94,34 +94,34 @@ export function registerBlobCreate(blob: Command): void {
       "private",
     )
     .option("--cors <origins...>", CORS_HELP, parseCorsOrigin)
-    .option("--env-file <path>", ENV_FILE_HELP)
+    .option("--write-env <path>", ENV_FILE_HELP)
     .addHelpText(
       "after",
-      "\nExample:\n  upstash blob create --name my-bucket --env-file .env.local",
+      "\nExample:\n  upstash blob create --name my-bucket --write-env .env.local",
     )
     .action(
       async (
-        flags: { name: string; visibility: BlobVisibility; cors?: string[]; envFile?: string },
+        flags: { name: string; visibility: BlobVisibility; cors?: string[]; writeEnv?: string },
         command: Command,
       ) => {
         const auth = resolveAuth(command);
-        if (flags.envFile !== undefined) await checkEnvFileTarget(flags.envFile);
+        if (flags.writeEnv !== undefined) await checkEnvFileTarget(flags.writeEnv);
         const bucket = await request<BlobBucket>(auth, "POST", "/v2/blob/bucket", {
           name: flags.name,
           visibility: flags.visibility,
           cors: flags.cors,
         });
-        if (flags.envFile === undefined) {
+        if (flags.writeEnv === undefined) {
           printJSON(bucket);
           return;
         }
         try {
-          printJSON(await saveBucketToken(bucket, flags.envFile));
+          printJSON(await saveBucketToken(bucket, flags.writeEnv));
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
           throw new Error(
             `bucket ${bucket.name} was created, but its token could not be written (${reason}); ` +
-              `run: upstash blob get ${bucket.name} --env-file ${shellQuote(flags.envFile)}`,
+              `run: upstash blob get ${bucket.name} --write-env ${shellQuote(flags.writeEnv)}`,
           );
         }
       },

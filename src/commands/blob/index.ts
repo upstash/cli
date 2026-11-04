@@ -3,6 +3,7 @@ import { registerBlobCreate } from "./create.js";
 import { registerBlobGet } from "./get.js";
 import { registerBlobDelete } from "./delete.js";
 import { registerBlobCredentials } from "./credentials.js";
+import { registerBlobCors } from "./cors.js";
 import { registerBlobLs } from "./ls.js";
 import { registerBlobCp, registerBlobMv } from "./cp.js";
 import { registerBlobRm } from "./rm.js";
@@ -17,6 +18,7 @@ export function registerBlob(program: Command): void {
   registerBlobGet(blob);
   registerBlobDelete(blob);
   registerBlobCredentials(blob);
+  registerBlobCors(blob);
   registerBlobLs(blob);
   registerBlobCp(blob);
   registerBlobMv(blob);

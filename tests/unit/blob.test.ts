@@ -1,8 +1,12 @@
+import { mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBlobProgram, runCommand } from "../helpers/program.js";
 import { fetchBlobCredentials } from "../../src/commands/blob/credentials.js";
 import { deleteBlobBucket } from "../../src/commands/blob/delete.js";
 import { isFreshlyCreated } from "../../src/commands/blob/retry.js";
+import { corsOriginProblem } from "../../src/commands/blob/create.js";
 import type { BlobBucket, BlobS3Credentials } from "../../src/types.js";
 
 const originalEnv = { ...process.env };
@@ -570,5 +574,173 @@ describe("blob delete retries", () => {
     await vi.advanceTimersByTimeAsync(3000);
 
     expect(await pending).toEqual({ deleted: true, bucket_id: "bucket_123" });
+  });
+});
+
+describe("--write-env", () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "upstash-env-file-"));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const tokenless = () => {
+    const { token: _t, token_next: _n, ...rest } = makeBucket();
+    return rest;
+  };
+  const mode = async (path: string) => (await stat(path)).mode & 0o777;
+
+  it("create writes a new file with mode 600 and prints the bucket without tokens", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
+    const path = join(dir, ".env.local");
+
+    const result = await runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path]);
+
+    expect(result).toEqual(tokenless());
+    expect(JSON.stringify(result)).not.toContain("token_");
+    expect(await readFile(path, "utf8")).toBe("UPSTASH_BLOB_TOKEN=token_current\n");
+    expect(await mode(path)).toBe(0o600);
+  });
+
+  it("get replaces an existing token line, keeps the rest, and narrows the mode", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
+    const path = join(dir, ".env.local");
+    await writeFile(path, "# app\nDATABASE_URL=postgres://x\nexport UPSTASH_BLOB_TOKEN=old\nOTHER=1\n# UPSTASH_BLOB_TOKEN=commented\n", { mode: 0o644 });
+
+    const result = await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
+
+    expect(result).toEqual(tokenless());
+    expect(await readFile(path, "utf8")).toBe(
+      "# app\nDATABASE_URL=postgres://x\nexport UPSTASH_BLOB_TOKEN=token_current\nOTHER=1\n# UPSTASH_BLOB_TOKEN=commented\n",
+    );
+    expect(await mode(path)).toBe(0o600);
+  });
+
+  it("appends to a file that has no token line and no trailing newline", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
+    const path = join(dir, ".env");
+    await writeFile(path, "A=1\r\nB=2");
+
+    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
+
+    expect(await readFile(path, "utf8")).toBe("A=1\r\nB=2\r\nUPSTASH_BLOB_TOKEN=token_current\r\n");
+  });
+
+  it("create refuses a target directory that does not exist before creating anything", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    await expect(
+      runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", join(dir, "missing", ".env")]),
+    ).rejects.toThrow(/does not exist/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("create refuses a symlink to an unreachable file before creating anything", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const path = join(dir, ".env");
+    await symlink(join(dir, "missing", "x"), path);
+    await expect(runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path])).rejects.toThrow(
+      /symlink to a file that cannot be reached/,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("writes through a symlink to a file not created yet", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
+    const path = join(dir, ".env");
+    await symlink(join(dir, "real.env"), path);
+    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
+    expect(await readFile(join(dir, "real.env"), "utf8")).toContain("UPSTASH_BLOB_TOKEN=");
+  });
+
+  it("keeps mixed line endings as they were", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(makeBucket()), { status: 200 }));
+    const path = join(dir, ".env");
+    await writeFile(path, "A=1\r\nUPSTASH_BLOB_TOKEN=old\nB=2\n");
+
+    await runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]);
+
+    expect(await readFile(path, "utf8")).toBe("A=1\r\nUPSTASH_BLOB_TOKEN=token_current\nB=2\n");
+  });
+
+  it("create refuses an empty path, a read-only file or a directory path before creating anything", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const readOnly = join(dir, ".env");
+    await writeFile(readOnly, "A=1\n", { mode: 0o400 });
+    // Root may write a 0400 file, so that case only holds for other users.
+    const cases: [string, RegExp][] = [["", /needs a path/], [join(dir, "new") + "/", /is a directory/]];
+    if (process.getuid?.() !== 0) cases.push([readOnly, /not writable/]);
+    for (const [path, message] of cases) {
+      await expect(
+        runCommand(await createBlobProgram(), ["blob", "create", "--name", "my-bucket", "--write-env", path]),
+      ).rejects.toThrow(message);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("refuses a response without a token and leaves the file alone", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(makeBucket({ token: undefined, token_next: undefined })), { status: 200 }),
+    );
+    const path = join(dir, ".env");
+    await writeFile(path, "A=1\n");
+    await expect(
+      runCommand(await createBlobProgram(), ["blob", "get", "--bucket-id", "bucket_123", "--write-env", path]),
+    ).rejects.toThrow(/no token/);
+    expect(await readFile(path, "utf8")).toBe("A=1\n");
+  });
+
+  it("is advertised in create and get help", async () => {
+    const program = await createBlobProgram();
+    const blob = program.commands.find((c) => c.name() === "blob")!;
+    for (const name of ["create", "get"]) {
+      const help = blob.commands.find((c) => c.name() === name)!.helpInformation();
+      expect(help).toContain("--write-env <path>");
+      expect(help).toContain("UPSTASH_BLOB_TOKEN");
+    }
+  });
+});
+
+describe("--cors validation", () => {
+  it.each([
+    ["", undefined],
+    ["localhost:3000", "http://localhost:3000"],
+    ["app.example.com", "https://app.example.com"],
+    ["http://localhost:3000/", "http://localhost:3000"],
+    ["https://app.example.com/upload", "https://app.example.com"],
+    ["HTTPS://App.Example.com", "https://app.example.com"],
+    ["https://a.com,https://b.com", undefined],
+    ["capacitor://localhost", undefined],
+    ["https://'*'", undefined],
+    ["https://a!b.com", undefined],
+  ])("rejects %j", (value, guess) => {
+    const problem = corsOriginProblem(value);
+    expect(problem).toContain(`${JSON.stringify(value)} is not a valid origin`);
+    if (guess) expect(problem).toContain(`did you mean ${guess}?`);
+  });
+
+  it.each(["*", "http://localhost:3000", "https://app.example.com", "https://*.example.com", "http://127.0.0.1:8080", "http://intranet:8080"])(
+    "accepts %j",
+    (value) => {
+      expect(corsOriginProblem(value)).toBeUndefined();
+    },
+  );
+
+  for (const command of [["create", "--name", "my-bucket"], ["mb", "blob://my-bucket"]]) {
+    it(`${command[0]} refuses an empty origin before calling the API`, async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await expect(runCommand(await createBlobProgram(), ["blob", ...command, "--cors", ""])).rejects.toThrow(/is not a valid origin/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      stderr.mockRestore();
+    });
+  }
+
+  it("create help says omitting --cors allows all origins", async () => {
+    const program = await createBlobProgram();
+    const blob = program.commands.find((c) => c.name() === "blob")!;
+    const help = blob.commands.find((c) => c.name() === "create")!.helpInformation().replace(/\s+/g, " ");
+    expect(help).toContain("Omit --cors to allow all origins (*)");
   });
 });

@@ -10,7 +10,7 @@ export function registerEnableDaily(backup: Command): void {
     .requiredOption("--db-id <id>", "Database ID")
     .action(async (flags: { dbId: string }, command: Command) => {
       const auth = resolveAuth(command);
-      const result = await request(auth, "POST", `/v2/redis/enable-dailybackup/${flags.dbId}`);
+      const result = await request(auth, "PATCH", `/v2/redis/enable-dailybackup/${flags.dbId}`);
       printJSON(result);
     });
 }

@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { registerCreate } from "./create.js";
+import { registerCreateBranch } from "./create-branch.js";
 import { registerList } from "./list.js";
 import { registerGet } from "./get.js";
 import { registerDelete } from "./delete.js";
@@ -22,6 +23,7 @@ export function registerRedis(program: Command): void {
   const redis = program.command("redis").description("Manage Redis databases");
 
   registerCreate(redis);
+  registerCreateBranch(redis);
   registerList(redis);
   registerGet(redis);
   registerDelete(redis);

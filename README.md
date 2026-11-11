@@ -87,6 +87,7 @@ Every command that returns account data outputs JSON, so you can pipe to `jq`. T
 upstash start-redis  # free temporary DB, no account needed
 upstash redis list
 upstash redis create --name my-db --region us-east-1
+upstash redis create-branch --db-id $DB_ID --name staging  # a copy of the data to test against
 upstash redis exec --db-url $URL --db-token $TOKEN GET key
 
 # Vector

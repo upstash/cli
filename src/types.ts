@@ -26,6 +26,8 @@ export type Region = (typeof REGIONS)[number];
 export interface Database {
   database_id: string;
   database_name: string;
+  root_database_id?: string;
+  source_database_id?: string;
   password?: string;
   endpoint?: string;
   port?: number;

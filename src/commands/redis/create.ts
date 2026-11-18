@@ -8,9 +8,7 @@ import type { Database } from "../../types.js";
 export function registerCreate(redis: Command): void {
   redis
     .command("create")
-    .description(
-      "Create a new Redis database. Needs an Upstash account; for a free throwaway database with no account, use the start-redis command.",
-    )
+    .description("Create a new Redis database")
     .requiredOption("--name <name>", "Database name")
     .requiredOption("--region <region>", `Primary region. Available: ${REGIONS.join(", ")}`)
     .option("--read-regions <regions...>", "Read replica regions (space-separated)")
